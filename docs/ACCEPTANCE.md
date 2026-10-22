@@ -1,8 +1,8 @@
-# Acceptance audit — 2026-10-22
+# Acceptance audit — updated 2026-10-23 (Asia/Shanghai)
 
-Core assignment features and local verification are complete. This is a local
-submission candidate, with known model-quality limitations. GitHub delivery and
-container/remote verification remain outstanding.
+Core assignment features, local verification and private GitHub delivery are complete.
+All five GitHub Actions jobs passed for source revision `b8af71c`. Known model-quality
+limitations and independent semantic review remain documented.
 
 | Requirement | Implementation and executed evidence | Remaining limitation |
 | --- | --- | --- |
@@ -12,19 +12,28 @@ container/remote verification remain outstanding.
 | CLI or web interface | Both implemented; six UI tests, production build, actual browser/source interaction | Browser QA at 614px width; desktop visual QA not performed |
 | Evaluation suite | 45 scenarios, 51 turns, 36 anchors; three complete real runs and retrieval comparison | Public development set; independent human review not completed |
 | Agent framework | LangChain provider/tools + bounded LangGraph state machine | One process/worker; no production authentication |
-| Reproducible environment | Python/npm locks, clean environment install, installed-wheel regression: 55 tests | Other OS and Docker runtime verification pending |
-| GitHub submission | Local Git repository, CI configuration, sanitized source and reports | No user-provided remote; nothing pushed |
+| Reproducible environment | Python/npm locks, clean environment install, installed-wheel regression: 55 tests | Windows/Linux CI and Docker build/start/health passed; containerized corpus/model execution untested |
+| GitHub submission | Private `adamboots3/gradual-policy-agent`, `main`, source revision `b8af71c` uploaded | Reviewers need private-repository access |
 
-## Before final submission
+## Delivery evidence
 
-1. Create an empty GitHub repository and provide its URL. Push the local revision
-   once the intended destination is known.
-2. Check the actual Windows/Linux and container jobs in GitHub Actions. Resolve
-   failures before calling cross-platform/container support verified.
-3. Review the live report and known issues. Human semantic-review fields are blank
-   deliberately; the coding agent's review is labeled separately.
-4. Include the repository URL and setup/demo instructions in the submission.
-   Reviewers provide their own model keys; credentials and local databases are ignored.
+Repository: [adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent),
+private, default branch `main`. Created using the user's existing account, matching
+visibility of the other assignment repository. Source revision: `b8af71c`.
 
-Docker is not installed on this host. No public deployment or remote repository has
-been created. No API keys are part of the handoff.
+[GitHub Actions run](https://github.com/adamboots3/gradual-policy-agent/actions/runs/39810856851): all five jobs passed:
+Windows/Linux backend, Windows/Linux frontend and Docker build/start/health smoke.
+Containerized corpus sync/index and paid model execution were not part of the smoke
+check; those paths were exercised natively on Windows. Docker is absent locally.
+
+## Final reviewer handoff
+
+- Include the repository URL and grant the intended reviewers access to the private
+  repository. Do not make it public or invite arbitrary accounts automatically.
+- Review the live report and known issues. Human review fields are blank deliberately;
+  the coding agent's qualitative review is labeled separately.
+- Reviewers supply their own model keys; credentials and local databases are ignored.
+  No API keys were uploaded and no GitHub Actions secrets were needed.
+
+No public application deployment has been created. The repository contains native
+and Compose startup instructions, actual demonstration screenshots and evaluation reports.

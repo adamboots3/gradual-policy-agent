@@ -149,3 +149,25 @@ Deterministic tests now override project settings with clean defaults so a local
 
 Still unverified: Docker build/runtime, other operating systems, remote GitHub CI,
 independent human answer adjudication, load behavior and exact provider cost.
+
+
+## GitHub delivery and CI — 2026-10-23 (Asia/Shanghai)
+
+At the user's request, inspected the other assignment's private `adamboots3/gradual-chat`
+repository and reused the existing authenticated account. Created the private
+[adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent)
+repository and uploaded source revision `b8af71c` to default branch `main`.
+The local `codex/policy-support-agent` branch tracks `origin/main`.
+
+[Verification run](https://github.com/adamboots3/gradual-policy-agent/actions/runs/39810856851) completed successfully:
+
+- Backend on Ubuntu and Windows: locked dependency install, Ruff checks and pytest.
+- Frontend on Ubuntu and Windows: locked npm install, tests, formatting and build.
+- Containers on Ubuntu: Compose build, healthy startup of both services, frontend
+  HTTP response, proxied API health response and cleanup.
+
+All five jobs passed. No model keys were uploaded or configured in Actions. Container
+corpus sync/index and live model calls are outside this smoke check's coverage.
+Source behavior was unchanged after this verified revision; the following handoff
+commit updates only documentation. Earlier statements that remote CI or repository
+creation remained pending are historical and superseded by this entry.

@@ -78,8 +78,11 @@ not independently reconciled. Token metadata is retained when the provider suppl
   build passed. No frontend changes followed that check.
 - Real Chinese two-turn browser flow, source switching and reopening saved history
   after refresh verified at 614px width. [Demo](DEMO.md) contains real responses.
-- Docker is absent locally. Prepared Compose and Windows/Linux/container CI have
-  not yet been executed remotely. No remote GitHub submission exists yet.
+- Source revision `b8af71c` is uploaded to the private repository
+  [adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent).
+- [GitHub Actions run](https://github.com/adamboots3/gradual-policy-agent/actions/runs/39810856851) passed all five jobs: Windows/Linux backend, Windows/Linux frontend,
+  and Docker build/start/health smoke. The Docker check does not exercise corpus
+  sync/index or paid model calls inside the containers. Docker remains absent locally.
 
 Known application limits include model overstatement, occasional false refusals,
 no authentication, one-worker locking, bounded history, a pinned rather than live

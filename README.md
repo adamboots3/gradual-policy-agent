@@ -3,6 +3,15 @@
 A take-home assignment: a conversational assistant grounded in a pinned snapshot of
 [GitHub's policy repository](https://github.com/github/site-policy).
 
+Submission repository: [adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent)
+(private, default branch `main`). Reviewers need repository access and their own
+model API keys; credentials and local conversation data are excluded.
+
+```sh
+git clone https://github.com/adamboots3/gradual-policy-agent.git
+cd gradual-policy-agent
+```
+
 **Current status:** a LangChain/LangGraph conversational backend with keyword or
 hybrid retrieval, durable conversations, bounded search and validated citation IDs.
 An interactive CLI, JSON API, React web UI and source-anchored evaluation suite are
@@ -10,8 +19,8 @@ implemented. The final configuration uses DeepSeek chat and Alibaba embeddings.
 55 backend tests and 6 frontend tests passed; a real 45-scenario / 51-turn run
 completed with valid citation provenance in every turn. Response-kind agreement was
 49/51, which is **not answer accuracy**. Known semantic failures and the retrieval
-comparison are documented in [Results](docs/RESULTS.md). Docker and remote CI remain
-unverified; the source is prepared for a GitHub handoff.
+comparison are documented in [Results](docs/RESULTS.md). Windows/Linux backend and frontend CI plus the Docker build/start/health smoke
+test all passed. See the [verified run](https://github.com/adamboots3/gradual-policy-agent/actions/runs/39810856851).
 
 ## Run locally
 
@@ -182,11 +191,11 @@ available at <http://localhost:8000/docs>. Nginx forwards `/api` to the backend.
 Corpus, index, conversations and checkpoints persist in a
 named volume. Both optional provider integrations are installed in the image;
 Compose reads `.env` at runtime if present (Compose 2.24+). No credentials are
-embedded in the image. Docker is an alternative
-to the native steps; its runtime validation is pending because Docker is unavailable
-on the current development machine. The frontend image installs from its npm lockfile.
-GitHub Actions is configured to build/start both containers and check the frontend
-and proxied health endpoint, but that workflow has not yet run in a remote repository.
+embedded in the image. Docker is an alternative to the native steps. The frontend
+image installs from its npm lockfile. GitHub Actions successfully built and started
+both containers and checked the frontend and proxied health endpoint. This smoke
+test does not execute containerized corpus sync/index or live model requests; native
+Windows verification covers those paths. Docker is unavailable on the development host.
 
 Run one API worker: per-conversation serialization currently uses process-local locks.
 Stop the server before replacing the corpus. Chat keeps the last six completed turns
@@ -205,7 +214,7 @@ prompt-injection resistance must be assessed in live answer evaluations.
 - [Verification record](docs/VERIFICATION.md): executed checks and remaining limitations.
 - [Results and limitations](docs/RESULTS.md): real runs, retrieval comparison and known failures.
 - [Live demonstration](docs/DEMO.md): Chinese follow-up with source links and screenshots.
-- [Submission checklist](docs/ACCEPTANCE.md): local handoff and remaining GitHub/CI steps.
+- [Submission checklist](docs/ACCEPTANCE.md): repository delivery and remaining review steps.
 - `.github/workflows/ci.yml`: Windows/Linux installs, backend and frontend tests,
   production build, and Linux container smoke checks.
 

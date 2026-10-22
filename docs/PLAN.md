@@ -17,7 +17,7 @@ Chat and embeddings use separate credentials. Tests require neither credential.
 | Conversational agent | Bounded tools, canonical completed history, per-chat locking, checkpoint cleanup and immutable citations implemented |
 | Answer evaluation | 45 cases / 51 turns executed in three full runs; structural checks and candid agent semantic review committed |
 | Web/CLI | Both implemented; real Chinese follow-up, citation inspection and history reopening verified in browser; six UI tests and production build passed |
-| Review handoff | Docs, real demo, reports, Docker/CI configuration prepared; final backend regression: 55 passed |
+| Review handoff | Docs, real demo, reports, Docker/CI configuration prepared; final backend regression: 55 passed; private GitHub delivery and all five CI jobs passed |
 
 ## Acceptance boundaries
 
@@ -25,9 +25,10 @@ Chat and embeddings use separate credentials. Tests require neither credential.
   trademark follow-up. Additional semantic overstatements remain documented.
 - The coding agent reviewed outputs; independent human review is still open.
   Citation syntax and expected-document recall are not answer correctness scores.
-- Docker, another operating system and GitHub Actions have not been executed here.
-- Git is initialized locally. GitHub delivery awaits the user's repository URL.
-  Do not invent a remote or claim a submitted revision without a successful push.
+- Windows/Linux backend and frontend checks plus Docker build/start/health smoke
+  passed in GitHub Actions. Containerized corpus/model execution remains untested.
+- Source revision `b8af71c` was pushed to `adamboots3/gradual-policy-agent` on `main`,
+  a private repository created at the user's request on 2026-10-23 (Asia/Shanghai).
 
 ## Decisions retained
 
