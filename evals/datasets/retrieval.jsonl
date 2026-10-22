@@ -1,0 +1,12 @@
+{"id":"appeal","query":"How can I appeal an account suspension?","expected_paths":["Policies/acceptable-use-policies/github-appeal-and-reinstatement.md"]}
+{"id":"appeal-deadline","query":"What is the deadline to appeal a moderation decision?","expected_paths":["Policies/acceptable-use-policies/github-appeal-and-reinstatement.md"]}
+{"id":"malware","query":"Can I host malware or exploits on GitHub?","expected_paths":["Policies/acceptable-use-policies/github-active-malware-or-exploits.md"]}
+{"id":"doxxing","query":"Is doxxing or publishing private personal information allowed?","expected_paths":["Policies/acceptable-use-policies/github-doxxing-and-invasion-of-privacy.md"]}
+{"id":"dmca","query":"How do I submit a DMCA takedown notice?","expected_paths":["Policies/content-removal-policies/guide-to-submitting-a-dmca-takedown-notice.md"]}
+{"id":"counter-notice","query":"How do I submit a DMCA counter notice?","expected_paths":["Policies/content-removal-policies/guide-to-submitting-a-dmca-counter-notice.md"]}
+{"id":"username","query":"What is the GitHub username policy?","expected_paths":["Policies/other-site-policies/github-username-policy.md"]}
+{"id":"trade-controls","query":"How do export controls and sanctions affect GitHub access?","expected_paths":["Policies/other-site-policies/github-and-trade-controls.md"]}
+{"id":"deceased","query":"What happens to the account of a deceased user?","expected_paths":["Policies/other-site-policies/github-deceased-user-policy.md"]}
+{"id":"cookies","query":"What cookies does GitHub use?","expected_paths":["Policies/privacy-policies/github-cookies.md"]}
+{"id":"impersonation","query":"Can I impersonate another person or organization?","expected_paths":["Policies/acceptable-use-policies/github-impersonation.md"]}
+{"id":"trademark","query":"How do I report trademark infringement?","expected_paths":["Policies/content-removal-policies/github-trademark-policy.md"]}

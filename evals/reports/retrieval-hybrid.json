@@ -1,0 +1,352 @@
+{
+  "evaluation": "hybrid-document-recall",
+  "live_model": true,
+  "embedding_provider": "openai",
+  "embedding_model": "qwen3.7-text-embedding-flash",
+  "timestamp": "2026-10-22T15:44:32.348061+00:00",
+  "corpus": {
+    "commit": "b9578b546d2506febda1da2cd7431644d58e512c",
+    "documents": 57,
+    "chunks": 721,
+    "parser_version": 1
+  },
+  "cases": [
+    {
+      "id": "appeal",
+      "query": "How can I appeal an account suspension?",
+      "expected_paths": [
+        "Policies/acceptable-use-policies/github-appeal-and-reinstatement.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/acceptable-use-policies/github-appeal-and-reinstatement.md",
+        "Policies/acceptable-use-policies/github-acceptable-use-policies.md",
+        "Policies/github-terms/github-community-guidelines.md",
+        "Policies/github-terms/github-sponsors-additional-terms.md",
+        "Policies/other-site-policies/github-and-trade-controls.md"
+      ]
+    },
+    {
+      "id": "appeal-deadline",
+      "query": "What is the deadline to appeal a moderation decision?",
+      "expected_paths": [
+        "Policies/acceptable-use-policies/github-appeal-and-reinstatement.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/acceptable-use-policies/github-appeal-and-reinstatement.md",
+        "Policies/github-terms/github-community-guidelines.md"
+      ]
+    },
+    {
+      "id": "malware",
+      "query": "Can I host malware or exploits on GitHub?",
+      "expected_paths": [
+        "Policies/acceptable-use-policies/github-active-malware-or-exploits.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/acceptable-use-policies/github-active-malware-or-exploits.md",
+        "Policies/acceptable-use-policies/github-acceptable-use-policies.md",
+        "Policies/acceptable-use-policies/github-child-sexual-exploitation-or-abuse.md",
+        "Policies/acceptable-use-policies/github-sexually-obscene-content.md",
+        "Policies/github-terms/github-pre-release-license-terms.md"
+      ]
+    },
+    {
+      "id": "doxxing",
+      "query": "Is doxxing or publishing private personal information allowed?",
+      "expected_paths": [
+        "Policies/acceptable-use-policies/github-doxxing-and-invasion-of-privacy.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/acceptable-use-policies/github-doxxing-and-invasion-of-privacy.md",
+        "Policies/content-removal-policies/github-private-information-removal-policy.md",
+        "Policies/acceptable-use-policies/github-acceptable-use-policies.md",
+        "Policies/github-terms/github-terms-of-service.md",
+        "Policies/other-site-policies/github-and-trade-controls.md"
+      ]
+    },
+    {
+      "id": "dmca",
+      "query": "How do I submit a DMCA takedown notice?",
+      "expected_paths": [
+        "Policies/content-removal-policies/guide-to-submitting-a-dmca-takedown-notice.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/content-removal-policies/dmca-takedown-policy.md",
+        "Policies/content-removal-policies/submitting-content-removal-requests.md",
+        "Policies/content-removal-policies/guide-to-submitting-a-dmca-takedown-notice.md"
+      ]
+    },
+    {
+      "id": "counter-notice",
+      "query": "How do I submit a DMCA counter notice?",
+      "expected_paths": [
+        "Policies/content-removal-policies/guide-to-submitting-a-dmca-counter-notice.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/content-removal-policies/dmca-takedown-policy.md",
+        "Policies/content-removal-policies/guide-to-submitting-a-dmca-counter-notice.md"
+      ]
+    },
+    {
+      "id": "username",
+      "query": "What is the GitHub username policy?",
+      "expected_paths": [
+        "Policies/other-site-policies/github-username-policy.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/other-site-policies/github-username-policy.md",
+        "Policies/content-removal-policies/github-trademark-policy.md"
+      ]
+    },
+    {
+      "id": "trade-controls",
+      "query": "How do export controls and sanctions affect GitHub access?",
+      "expected_paths": [
+        "Policies/other-site-policies/github-and-trade-controls.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/other-site-policies/github-and-trade-controls.md",
+        "Policies/github-terms/github-corporate-terms-of-service.md"
+      ]
+    },
+    {
+      "id": "deceased",
+      "query": "What happens to the account of a deceased user?",
+      "expected_paths": [
+        "Policies/other-site-policies/github-deceased-user-policy.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/other-site-policies/github-deceased-user-policy.md",
+        "Policies/other-site-policies/github-account-recovery-policy.md",
+        "Policies/github-terms/github-terms-of-service.md",
+        "Policies/github-terms/github-corporate-terms-of-service.md",
+        "Policies/acceptable-use-policies/github-acceptable-use-policies.md",
+        "Policies/other-site-policies/guidelines-for-legal-requests-of-user-data.md"
+      ]
+    },
+    {
+      "id": "cookies",
+      "query": "What cookies does GitHub use?",
+      "expected_paths": [
+        "Policies/privacy-policies/github-cookies.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/privacy-policies/github-cookies.md",
+        "Policies/privacy-policies/github-general-privacy-statement.md",
+        "Policies/privacy-policies/github-candidate-privacy-policy.md"
+      ]
+    },
+    {
+      "id": "impersonation",
+      "query": "Can I impersonate another person or organization?",
+      "expected_paths": [
+        "Policies/acceptable-use-policies/github-impersonation.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/acceptable-use-policies/github-impersonation.md",
+        "Policies/acceptable-use-policies/github-acceptable-use-policies.md",
+        "Policies/github-terms/github-terms-of-service.md",
+        "Policies/other-site-policies/guidelines-for-legal-requests-of-user-data.md",
+        "Policies/privacy-policies/github-general-privacy-statement.md",
+        "Policies/github-terms/github-corporate-terms-of-service.md"
+      ]
+    },
+    {
+      "id": "trademark",
+      "query": "How do I report trademark infringement?",
+      "expected_paths": [
+        "Policies/content-removal-policies/github-trademark-policy.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/content-removal-policies/github-trademark-policy.md",
+        "Policies/content-removal-policies/submitting-content-removal-requests.md"
+      ]
+    },
+    {
+      "id": "zh-appeal",
+      "query": "\u8d26\u53f7\u88ab\u5c01\u4e86\uff0c\u8fd8\u80fd\u5728\u591a\u957f\u65f6\u95f4\u5185\u7533\u8bc9\uff1f",
+      "expected_paths": [
+        "Policies/acceptable-use-policies/github-appeal-and-reinstatement.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/acceptable-use-policies/github-appeal-and-reinstatement.md",
+        "Policies/other-site-policies/guidelines-for-legal-requests-of-user-data.md",
+        "Policies/github-terms/github-terms-of-service.md",
+        "Policies/content-removal-policies/github-trademark-policy.md",
+        "Policies/github-terms/github-corporate-terms-of-service.md",
+        "Policies/content-removal-policies/dmca-takedown-policy.md"
+      ]
+    },
+    {
+      "id": "zh-recovery",
+      "query": "\u4e22\u5931\u4e24\u6b65\u9a8c\u8bc1\u548c\u6240\u6709\u6062\u590d\u51ed\u636e\uff0c\u5ba2\u670d\u80fd\u5e2e\u6211\u627e\u56de\u5417\uff1f",
+      "expected_paths": [
+        "Policies/other-site-policies/github-account-recovery-policy.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/other-site-policies/github-account-recovery-policy.md",
+        "Policies/github-terms/github-terms-of-service.md"
+      ]
+    },
+    {
+      "id": "zh-doxxing",
+      "query": "\u6709\u4eba\u6cc4\u9732\u6211\u7684\u5bb6\u5ead\u4f4f\u5740\uff0c\u662f\u5426\u8fdd\u89c4\uff1f",
+      "expected_paths": [
+        "Policies/acceptable-use-policies/github-doxxing-and-invasion-of-privacy.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/acceptable-use-policies/github-doxxing-and-invasion-of-privacy.md",
+        "Policies/github-terms/github-secret-scanning-partner-program-agreement.md",
+        "Policies/other-site-policies/guidelines-for-legal-requests-of-user-data.md",
+        "Policies/acceptable-use-policies/github-non-consensual-intimate-imagery.md",
+        "Policies/privacy-policies/github-candidate-privacy-policy.md"
+      ]
+    },
+    {
+      "id": "zh-username",
+      "query": "\u6211\u80fd\u82b1\u94b1\u4e70\u4e00\u4e2aGitHub\u7528\u6237\u540d\u5417\uff1f",
+      "expected_paths": [
+        "Policies/other-site-policies/github-username-policy.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/other-site-policies/github-username-policy.md",
+        "Policies/content-removal-policies/github-trademark-policy.md",
+        "Policies/other-site-policies/github-and-trade-controls.md"
+      ]
+    },
+    {
+      "id": "zh-forks",
+      "query": "GitHub\u4f1a\u81ea\u52a8\u4e0b\u67b6\u88ab\u4fb5\u6743\u4ed3\u5e93\u7684\u6240\u6709\u6d3e\u751f\u4ed3\u5e93\u5417\uff1f",
+      "expected_paths": [
+        "Policies/content-removal-policies/dmca-takedown-policy.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/content-removal-policies/dmca-takedown-policy.md",
+        "Policies/github-terms/github-terms-of-service.md",
+        "Policies/acceptable-use-policies/github-acceptable-use-policies.md",
+        "Policies/content-removal-policies/github-private-information-removal-policy.md"
+      ]
+    },
+    {
+      "id": "zh-deceased",
+      "query": "\u56e2\u961f\u540c\u4e8b\u53bb\u4e16\uff0c\u8c01\u80fd\u5411GitHub\u7533\u8bf7\u5904\u7406\u4ed6\u7684\u4ee3\u7801\u4ed3\u5e93\uff1f",
+      "expected_paths": [
+        "Policies/other-site-policies/github-deceased-user-policy.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/other-site-policies/github-deceased-user-policy.md",
+        "Policies/github-terms/github-corporate-terms-of-service.md",
+        "Policies/security-policies/coordinated-disclosure-of-security-vulnerabilities.md",
+        "Policies/security-policies/github-sirt-description-rfc-2350.md",
+        "Policies/github-terms/github-community-code-of-conduct.md",
+        "Policies/github-terms/github-community-guidelines.md"
+      ]
+    },
+    {
+      "id": "paraphrase-research",
+      "query": "May I publish proof-of-concept vulnerability research?",
+      "expected_paths": [
+        "Policies/acceptable-use-policies/github-active-malware-or-exploits.md"
+      ],
+      "recall_at_6": 0.0,
+      "retrieved_paths": [
+        "Policies/security-policies/github-bug-bounty-program-legal-safe-harbor.md",
+        "Policies/security-policies/coordinated-disclosure-of-security-vulnerabilities.md",
+        "Policies/github-terms/github-research-program-terms.md",
+        "Policies/github-terms/github-terms-for-additional-products-and-features.md"
+      ]
+    },
+    {
+      "id": "paraphrase-parody",
+      "query": "Can a parody profile resemble someone else's handle without misleading people?",
+      "expected_paths": [
+        "Policies/acceptable-use-policies/github-impersonation.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/acceptable-use-policies/github-impersonation.md",
+        "Policies/acceptable-use-policies/github-misinformation-and-disinformation.md",
+        "Policies/github-terms/github-secret-scanning-partner-program-agreement.md",
+        "Policies/github-terms/github-copilot-extension-developer-policy.md",
+        "Policies/github-terms/github-community-guidelines.md",
+        "Policies/content-removal-policies/github-trademark-policy.md"
+      ]
+    },
+    {
+      "id": "paraphrase-username",
+      "query": "Can I reclaim a handle that looks abandoned?",
+      "expected_paths": [
+        "Policies/other-site-policies/github-username-policy.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/other-site-policies/github-username-policy.md",
+        "Policies/acceptable-use-policies/github-appeal-and-reinstatement.md",
+        "Policies/github-terms/github-secret-scanning-partner-program-agreement.md",
+        "Policies/other-site-policies/github-account-recovery-policy.md",
+        "Policies/github-terms/github-community-guidelines.md",
+        "Policies/github-terms/github-corporate-terms-of-service.md"
+      ]
+    },
+    {
+      "id": "paraphrase-recovery",
+      "query": "I lost my second factor and backups. Will staff verify my passport to restore access?",
+      "expected_paths": [
+        "Policies/other-site-policies/github-account-recovery-policy.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/other-site-policies/github-account-recovery-policy.md",
+        "Policies/privacy-policies/github-candidate-privacy-policy.md",
+        "Policies/other-site-policies/github-and-trade-controls.md"
+      ]
+    },
+    {
+      "id": "paraphrase-private",
+      "query": "Does listing an internal hostname by itself qualify for the confidential data removal process?",
+      "expected_paths": [
+        "Policies/content-removal-policies/github-private-information-removal-policy.md"
+      ],
+      "recall_at_6": 1.0,
+      "retrieved_paths": [
+        "Policies/content-removal-policies/github-private-information-removal-policy.md",
+        "Policies/content-removal-policies/submitting-content-removal-requests.md",
+        "Policies/github-terms/github-registered-developer-agreement.md",
+        "Policies/github-terms/github-secret-scanning-partner-program-agreement.md"
+      ]
+    },
+    {
+      "id": "paraphrase-copyright",
+      "query": "Where is the procedure for challenging an erroneous copyright removal?",
+      "expected_paths": [
+        "Policies/content-removal-policies/guide-to-submitting-a-dmca-counter-notice.md"
+      ],
+      "recall_at_6": 0.0,
+      "retrieved_paths": [
+        "Policies/content-removal-policies/dmca-takedown-policy.md",
+        "Policies/content-removal-policies/submitting-content-removal-requests.md",
+        "Policies/github-terms/github-corporate-terms-of-service.md",
+        "Policies/content-removal-policies/github-private-information-removal-policy.md"
+      ]
+    }
+  ],
+  "mean_recall_at_6": 0.9166666666666666
+}

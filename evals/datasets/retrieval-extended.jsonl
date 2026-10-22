@@ -1,0 +1,24 @@
+{"id":"appeal","query":"How can I appeal an account suspension?","expected_paths":["Policies/acceptable-use-policies/github-appeal-and-reinstatement.md"]}
+{"id":"appeal-deadline","query":"What is the deadline to appeal a moderation decision?","expected_paths":["Policies/acceptable-use-policies/github-appeal-and-reinstatement.md"]}
+{"id":"malware","query":"Can I host malware or exploits on GitHub?","expected_paths":["Policies/acceptable-use-policies/github-active-malware-or-exploits.md"]}
+{"id":"doxxing","query":"Is doxxing or publishing private personal information allowed?","expected_paths":["Policies/acceptable-use-policies/github-doxxing-and-invasion-of-privacy.md"]}
+{"id":"dmca","query":"How do I submit a DMCA takedown notice?","expected_paths":["Policies/content-removal-policies/guide-to-submitting-a-dmca-takedown-notice.md"]}
+{"id":"counter-notice","query":"How do I submit a DMCA counter notice?","expected_paths":["Policies/content-removal-policies/guide-to-submitting-a-dmca-counter-notice.md"]}
+{"id":"username","query":"What is the GitHub username policy?","expected_paths":["Policies/other-site-policies/github-username-policy.md"]}
+{"id":"trade-controls","query":"How do export controls and sanctions affect GitHub access?","expected_paths":["Policies/other-site-policies/github-and-trade-controls.md"]}
+{"id":"deceased","query":"What happens to the account of a deceased user?","expected_paths":["Policies/other-site-policies/github-deceased-user-policy.md"]}
+{"id":"cookies","query":"What cookies does GitHub use?","expected_paths":["Policies/privacy-policies/github-cookies.md"]}
+{"id":"impersonation","query":"Can I impersonate another person or organization?","expected_paths":["Policies/acceptable-use-policies/github-impersonation.md"]}
+{"id":"trademark","query":"How do I report trademark infringement?","expected_paths":["Policies/content-removal-policies/github-trademark-policy.md"]}
+{"id": "zh-appeal", "query": "账号被封了，还能在多长时间内申诉？", "expected_paths": ["Policies/acceptable-use-policies/github-appeal-and-reinstatement.md"]}
+{"id": "zh-recovery", "query": "丢失两步验证和所有恢复凭据，客服能帮我找回吗？", "expected_paths": ["Policies/other-site-policies/github-account-recovery-policy.md"]}
+{"id": "zh-doxxing", "query": "有人泄露我的家庭住址，是否违规？", "expected_paths": ["Policies/acceptable-use-policies/github-doxxing-and-invasion-of-privacy.md"]}
+{"id": "zh-username", "query": "我能花钱买一个GitHub用户名吗？", "expected_paths": ["Policies/other-site-policies/github-username-policy.md"]}
+{"id": "zh-forks", "query": "GitHub会自动下架被侵权仓库的所有派生仓库吗？", "expected_paths": ["Policies/content-removal-policies/dmca-takedown-policy.md"]}
+{"id": "zh-deceased", "query": "团队同事去世，谁能向GitHub申请处理他的代码仓库？", "expected_paths": ["Policies/other-site-policies/github-deceased-user-policy.md"]}
+{"id": "paraphrase-research", "query": "May I publish proof-of-concept vulnerability research?", "expected_paths": ["Policies/acceptable-use-policies/github-active-malware-or-exploits.md"]}
+{"id": "paraphrase-parody", "query": "Can a parody profile resemble someone else's handle without misleading people?", "expected_paths": ["Policies/acceptable-use-policies/github-impersonation.md"]}
+{"id": "paraphrase-username", "query": "Can I reclaim a handle that looks abandoned?", "expected_paths": ["Policies/other-site-policies/github-username-policy.md"]}
+{"id": "paraphrase-recovery", "query": "I lost my second factor and backups. Will staff verify my passport to restore access?", "expected_paths": ["Policies/other-site-policies/github-account-recovery-policy.md"]}
+{"id": "paraphrase-private", "query": "Does listing an internal hostname by itself qualify for the confidential data removal process?", "expected_paths": ["Policies/content-removal-policies/github-private-information-removal-policy.md"]}
+{"id": "paraphrase-copyright", "query": "Where is the procedure for challenging an erroneous copyright removal?", "expected_paths": ["Policies/content-removal-policies/guide-to-submitting-a-dmca-counter-notice.md"]}
