@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
+from policy_agent.chat import ChatService, HistoryTurn
 from policy_agent.config import Settings
-from policy_agent.conversations import ConversationService
 from policy_agent.ingestion import git
 from policy_agent.providers import create_chat
 from policy_agent.retrieval import corpus_status
@@ -130,52 +130,44 @@ def structural_checks(response: dict, turn: EvalTurn, anchors: dict, database: P
     }
 
 
-def evaluate(
-    dataset: Dataset, anchors: dict, service: ConversationService, limit: int | None = None
-):
+def evaluate(dataset: Dataset, anchors: dict, service: ChatService, limit: int | None = None):
     results = []
     for case in dataset.cases[:limit]:
-        conversation = service.create()["id"]
+        history = []
         turns = []
-        try:
-            for index, turn in enumerate(case.turns):
-                item = {
-                    "turn": index + 1,
-                    "question": turn.question,
-                    "expected": turn.model_dump(exclude={"question"}),
-                    "human_review": {
-                        "correctness": None,
-                        "grounding": None,
-                        "citation_support": None,
-                        "notes": "",
-                    },
-                }
-                try:
-                    response = service.chat(conversation, turn.question)
-                    item["response"] = response
-                    item["checks"] = structural_checks(
-                        response, turn, anchors, service.settings.database, dataset.corpus_commit
-                    )
-                    with service.connect() as db:
-                        raw = db.execute(
-                            "SELECT metadata FROM runs WHERE id=?", (response["run_id"],)
-                        ).fetchone()
-                    item["trace"] = json.loads(raw[0]).get("trace", []) if raw else []
-                except Exception as exc:
-                    item["error_type"] = type(exc).__name__
-                    turns.append(item)
-                    break  # Follow-ups cannot be interpreted after a failed setup turn.
+        for index, turn in enumerate(case.turns):
+            item = {
+                "turn": index + 1,
+                "question": turn.question,
+                "expected": turn.model_dump(exclude={"question"}),
+                "human_review": {
+                    "correctness": None,
+                    "grounding": None,
+                    "citation_support": None,
+                    "notes": "",
+                },
+            }
+            try:
+                response = service.chat(turn.question, history, include_trace=True)
+                item["trace"] = response.pop("trace", [])
+                item["response"] = response
+                item["checks"] = structural_checks(
+                    response, turn, anchors, service.settings.database, dataset.corpus_commit
+                )
+                history.append(HistoryTurn(question=turn.question, answer=response["answer"]))
+            except Exception as exc:
+                item["error_type"] = type(exc).__name__
                 turns.append(item)
-            results.append(
-                {
-                    "id": case.id,
-                    "category": case.category,
-                    "turns": turns,
-                    "expected_turns": len(case.turns),
-                }
-            )
-        finally:
-            service.delete(conversation)
+                break  # Follow-ups cannot be interpreted after a failed setup turn.
+            turns.append(item)
+        results.append(
+            {
+                "id": case.id,
+                "category": case.category,
+                "turns": turns,
+                "expected_turns": len(case.turns),
+            }
+        )
     return results
 
 
@@ -214,7 +206,7 @@ def main():
     status = corpus_status(settings.database)
     if status["commit"] != dataset.corpus_commit:
         parser.error("Indexed corpus does not match the dataset; sync and index the pinned source.")
-    # Isolate eval conversation/checkpoint state from the user's workspace history.
+    # Freeze evaluation evidence in a temporary corpus copy; context remains in memory.
     with tempfile.TemporaryDirectory(prefix="policy-eval-", dir=settings.data_dir) as temp:
         evaluation_settings = settings.model_copy(update={"data_dir": Path(temp)})
         with (
@@ -222,7 +214,7 @@ def main():
             closing(sqlite3.connect(evaluation_settings.database)) as target,
         ):
             source.backup(target)
-        results = evaluate(dataset, anchors, ConversationService(evaluation_settings), args.limit)
+        results = evaluate(dataset, anchors, ChatService(evaluation_settings), args.limit)
     turns = [turn for case in results for turn in case["turns"]]
     completed = [turn for turn in turns if "checks" in turn]
     check_names = (
@@ -248,6 +240,7 @@ def main():
         "embedding_provider": settings.embedding_provider,
         "embedding_model": settings.embedding_model,
         "retrieval_mode": settings.retrieval_mode,
+        "conversation_mode": "caller-owned-memory",
         "cases": results,
         "summary": {
             "cases": len(results),

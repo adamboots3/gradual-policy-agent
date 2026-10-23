@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   ArrowUp,
   ArrowUpRight,
@@ -15,15 +15,12 @@ import {
   Plus,
   RotateCcw,
   ShieldCheck,
-  Trash2,
   X,
 } from "lucide-react";
 import {
   api,
-  ApiError,
   type Answer,
   type Citation,
-  type Conversation,
   type Health,
   type Knowledge,
   type Turn,
@@ -157,8 +154,7 @@ function Sources({
 }
 
 export default function App() {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [active, setActive] = useState<string | null>(null);
+  const questionId = useId();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [knowledge, setKnowledge] = useState<Knowledge | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
@@ -170,20 +166,20 @@ export default function App() {
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
   const [source, setSource] = useState<Citation | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
   const working = useRef(false);
+  const generation = useRef(0);
+  const controller = useRef<AbortController | null>(null);
   const scrollEnd = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let cancelled = false;
     setBooting(true);
-    Promise.all([api.health(), api.knowledge(), api.conversations()])
-      .then(([h, k, list]) => {
+    Promise.all([api.health(), api.knowledge()])
+      .then(([h, k]) => {
         if (!cancelled) {
           setHealth(h);
           setKnowledge(k);
-          setConversations(list);
           setBootError("");
         }
       })
@@ -203,56 +199,32 @@ export default function App() {
       scrollEnd.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
   }, [turns, pending]);
 
-  async function openConversation(id: string) {
-    if (working.current) return;
-    working.current = true;
-    setBusy("load");
-    setError("");
-    try {
-      const detail = await api.get(id);
-      setActive(id);
-      setTurns(detail.turns);
-      setDraft("");
-      setSource(null);
-    } catch (e) {
-      setError(message(e));
-    } finally {
-      working.current = false;
-      setBusy("");
-    }
-  }
-
-  function newConversation() {
-    if (working.current) return;
-    setActive(null);
+  function clearWindow() {
+    generation.current += 1;
+    controller.current?.abort();
+    controller.current = null;
+    working.current = false;
+    setBusy("");
+    setPending("");
     setTurns([]);
     setDraft("");
     setSource(null);
     setError("");
-    input.current?.focus();
   }
 
-  async function removeConversation(id: string) {
+  useEffect(() => {
+    window.addEventListener("pagehide", clearWindow);
+    return () => {
+      window.removeEventListener("pagehide", clearWindow);
+      generation.current += 1;
+      controller.current?.abort();
+    };
+  }, []);
+
+  function newConversation() {
     if (working.current) return;
-    working.current = true;
-    setBusy("delete");
-    setError("");
-    try {
-      await api.remove(id);
-      setConversations((list) => list.filter((c) => c.id !== id));
-      if (active === id) {
-        setActive(null);
-        setTurns([]);
-        setDraft("");
-        setSource(null);
-      }
-      setDeleting(null);
-    } catch (e) {
-      setError(message(e));
-    } finally {
-      working.current = false;
-      setBusy("");
-    }
+    clearWindow();
+    input.current?.focus();
   }
 
   async function send() {
@@ -270,44 +242,26 @@ export default function App() {
     setPending(question);
     setDraft("");
     setError("");
+    const requestGeneration = generation.current;
+    const requestController = new AbortController();
+    controller.current = requestController;
     try {
-      let id = active;
-      if (!id) {
-        const created = await api.create();
-        id = created.id;
-        setActive(id);
-        setConversations((list) => [{ ...created, title: question }, ...list]);
-      }
-      const answer = await api.send(id, question);
+      const answer = await api.send(question, turns, requestController.signal);
+      if (generation.current !== requestGeneration) return;
       setTurns((previous) => [...previous, { question, response: answer }]);
-      setConversations((list) =>
-        list.map((c) =>
-          c.id === id
-            ? {
-                ...c,
-                title: c.turn_count ? c.title : question,
-                turn_count: (c.turn_count || 0) + 1,
-              }
-            : c,
-        ),
-      );
       if (answer.citations.length) setSource(answer.citations[0]);
     } catch (e) {
+      if (generation.current !== requestGeneration) return;
       setDraft(question);
-      const uncertain =
-        e instanceof ApiError &&
-        (e.status === 0 ||
-          (e.status >= 500 && e.status !== 502 && e.status !== 503));
-      if (uncertain) {
-        setError(
-          `${message(e)} The reply may have completed. Reopen this conversation before resending.`,
-        );
-      } else setError(message(e));
+      setError(message(e));
     } finally {
-      setPending("");
-      working.current = false;
-      setBusy("");
-      input.current?.focus();
+      if (generation.current === requestGeneration) {
+        setPending("");
+        working.current = false;
+        controller.current = null;
+        setBusy("");
+        input.current?.focus();
+      }
     }
   }
 
@@ -323,7 +277,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar" aria-label="Conversations">
+      <aside className="sidebar" aria-label="Policy workspace">
         <a
           className="brand"
           href="#"
@@ -346,41 +300,15 @@ export default function App() {
         >
           <Plus size={17} /> New conversation <span>↗</span>
         </button>
-        <div className="history-heading">
-          YOUR CONVERSATIONS{" "}
-          <span>{conversations.length.toString().padStart(2, "0")}</span>
+        <div className="session-info">
+          <MessageSquare size={18} />
+          <strong>This window only</strong>
+          <p>
+            Follow up in this chat. Closing or refreshing the window clears the
+            conversation.
+          </p>
+          <p>Chat history is not saved by this app.</p>
         </div>
-        <nav className="conversation-list" aria-label="Conversation history">
-          {conversations.length === 0 && (
-            <p className="no-conversations">
-              Your conversations will live here.
-            </p>
-          )}
-          {conversations.map((c) => (
-            <div
-              className={`conversation-item ${active === c.id ? "selected" : ""}`}
-              key={c.id}
-            >
-              <button
-                className="conversation-select"
-                disabled={disabled}
-                onClick={() => openConversation(c.id)}
-                aria-current={active === c.id ? "page" : undefined}
-              >
-                <MessageSquare size={15} />
-                <span>{c.title || "New conversation"}</span>
-              </button>
-              <button
-                className="delete-button"
-                aria-label={`Delete ${c.title || "conversation"}`}
-                disabled={disabled}
-                onClick={() => setDeleting(c.id)}
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
-        </nav>
         <div className="library-card">
           <div className="library-label">
             <span
@@ -425,40 +353,15 @@ export default function App() {
             {booting ? "Connecting" : bootError ? "Offline" : "Connected"}
           </span>
         </header>
-        <div className="mobile-conversations">
-          <select
-            aria-label="Choose conversation"
-            value={active || ""}
-            disabled={disabled}
-            onChange={(e) =>
-              e.target.value
-                ? void openConversation(e.target.value)
-                : newConversation()
-            }
-          >
-            <option value="">New conversation</option>
-            {conversations.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title || "New conversation"}
-              </option>
-            ))}
-          </select>
+        <div className="mobile-session">
+          <span>This window only · history is not saved</span>
           <button
             aria-label="New mobile conversation"
             disabled={disabled}
             onClick={newConversation}
           >
-            <Plus size={16} />
+            <Plus size={16} /> New chat
           </button>
-          {active && (
-            <button
-              aria-label="Delete current conversation"
-              disabled={disabled}
-              onClick={() => setDeleting(active)}
-            >
-              <Trash2 size={15} />
-            </button>
-          )}
         </div>
         <section className="chat-region" aria-label="Chat">
           {(bootError || setupIssue) && (
@@ -474,11 +377,6 @@ export default function App() {
               >
                 Refresh
               </button>
-            </div>
-          )}
-          {busy === "load" && (
-            <div className="loading-history" role="status">
-              <LoaderCircle className="spin" size={15} /> Opening conversation…
             </div>
           )}
           <div className="chat-scroll">
@@ -601,11 +499,11 @@ export default function App() {
                 void send();
               }}
             >
-              <label className="sr-only" htmlFor="question">
+              <label className="sr-only" htmlFor={questionId}>
                 Ask a policy question
               </label>
               <textarea
-                id="question"
+                id={questionId}
                 ref={input}
                 placeholder="Ask a question about GitHub policies…"
                 value={draft}
@@ -648,69 +546,13 @@ export default function App() {
               </div>
             </form>
             <p className="composer-note">
-              Answers reflect the indexed policy snapshot. Check cited sources
-              for the full context.
+              This chat is temporary. Closing or refreshing clears it. Check
+              cited sources for policy context.
             </p>
           </div>
         </section>
       </main>
       <Sources source={source} onClose={() => setSource(null)} />
-      {deleting && (
-        <div className="dialog-backdrop">
-          <section
-            className="confirm-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-title"
-            onKeyDown={(e) => {
-              if (e.key === "Escape" && !busy) {
-                setDeleting(null);
-                input.current?.focus();
-              }
-              if (e.key === "Tab") {
-                const buttons = Array.from(
-                  e.currentTarget.querySelectorAll("button:not(:disabled)"),
-                );
-                const first = buttons[0] as HTMLButtonElement;
-                const last = buttons.at(-1) as HTMLButtonElement;
-                if (e.shiftKey && document.activeElement === first) {
-                  e.preventDefault();
-                  last?.focus();
-                } else if (!e.shiftKey && document.activeElement === last) {
-                  e.preventDefault();
-                  first?.focus();
-                }
-              }
-            }}
-          >
-            <Trash2 size={23} />
-            <h2 id="delete-title">Delete this conversation?</h2>
-            <p>
-              The messages and their saved sources will be removed. This cannot
-              be undone.
-            </p>
-            <div>
-              <button
-                disabled={Boolean(busy)}
-                onClick={() => {
-                  setDeleting(null);
-                  input.current?.focus();
-                }}
-              >
-                Keep conversation
-              </button>
-              <button
-                className="danger"
-                disabled={Boolean(busy)}
-                onClick={() => void removeConversation(deleting)}
-                autoFocus
-              >
-                Delete conversation
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
     </div>
   );
 }

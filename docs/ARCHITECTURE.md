@@ -1,143 +1,116 @@
 # Architecture and contracts
 
-## Data flow
+## Current interaction model — 2026-10-24
+
+Web access only. The page owns completed turns in React memory; the server has no
+conversation store, session identifier, shared chat memory or persistent checkpointer.
+New tabs are empty. New chat, refresh, navigation away or window closure clears the
+page state. Page exit aborts the client request and invalidates late responses; the
+server may finish an already-running request, but never saves its dialogue.
 
 ```mermaid
-flowchart LR
-  A[Pinned Git policy snapshot] --> B[Markdown parser]
-  B --> C[SQLite chunks and FTS5]
-  B --> D[Embedding cache]
-  U[React web client] --> API[FastAPI]
-  API --> C
-  API --> G[LangGraph conversation agent]
-  G --> C
-  G --> D
-  G --> M[Configured chat model]
+sequenceDiagram
+    autonumber
+    box rgb(219,234,254) Starting point
+        participant U as User
+    end
+    participant W as Current chat window
+    participant B as FastAPI
+    box Agent execution
+        participant A as LangGraph controller
+        participant L as Configurable LLM
+    end
+    box Policy retrieval
+        participant R as Retrieval tool
+        participant E as Configurable embeddings
+        participant K as Policy index
+    end
+    U->>W: Ask or follow up
+    W->>B: Question + temporary completed context
+    B->>A: Process this request
+    A->>L: Context and tool descriptions
+    L-->>A: Request policy search
+    A->>R: Execute search query
+    R->>E: Embed query text
+    E-->>R: Query vector
+    R->>K: Keyword and vector search
+    K-->>R: Policy candidates
+    R->>R: Fuse ranks and add neighboring clauses
+    R-->>A: Evidence and source IDs
+    A->>L: Supply retrieved evidence
+    L-->>A: Submit answer and citation IDs
+    A->>A: Validate IDs and build citation links
+    A-->>B: Final response
+    B-->>W: Answer and source excerpts
+    W->>W: Update temporary in-window context
+    W-->>U: Display answer
 ```
 
-The backend graph, retrieval components and React client are implemented and tested
-with scripted doubles and real DeepSeek/Bailian requests. See `RESULTS.md` for measured limits.
+The diagram describes the common hybrid path. Keyword mode omits query embeddings;
+the model can search again within its budget or request clarification. Document
+vectors are built ahead of time, not regenerated per question. Citation checking is
+code inside the agent's submit-answer handling, not a separate AI verifier.
 
-## Evidence contract (implemented)
+## Evidence and retrieval
 
-Each chunk has `chunk_id`, `title`, `heading`, `content`, `path`, `start_line`,
-`end_line`, `commit_sha`, `source_url`, and `content_hash`. IDs are deterministic
-for one source version, file path, line range and content. URLs link to immutable
-GitHub blob lines. YAML metadata is excluded without shifting body line numbers.
-Markdown sections are split at headings, then at paragraph boundaries when large.
-The size limit is soft so paragraphs, lists, tables and fenced code remain intact.
+`corpus.lock.json` fixes the Git source commit. Parsing preserves title, heading,
+path, original line range, content hash and immutable GitHub URL. Chunk IDs include
+source identity. Index replacement is transactional; dirty or mismatched source is
+rejected. SQLite stores policy chunks, FTS5 and cached embeddings only.
 
-Index replacement is transactional, including the FTS index and corpus metadata.
-Search tokenizes user input before constructing an FTS expression. FTS snippets
-are evidence candidates, not a confidence estimate or proof of sufficient support.
+Hybrid retrieval fuses up to 20 keyword and 20 semantic candidates using
+`1/(60+rank)`, normally returning six seeds. The agent's search tool adds up to four
+neighboring chunks from the top three seeds; at most ten pieces of evidence per
+search. The public search API and retrieval benchmark do not add neighbors.
 
-## Implemented API
+Embedding identity includes provider, model, endpoint, input hash and dimensions.
+Incompatible indexes fail explicitly. Compatible adapters send raw text and request
+float vectors. Chat and embedding services are independently configurable.
 
-| Method | Path | Meaning |
+## Request-scoped agent
+
+`ChatService.chat(question, history)` creates a fresh graph invocation. History is
+caller-owned, limited to completed question/answer pairs, at most 20 pairs; the last
+six enter model context by default. It is never used as policy evidence. No model
+initialization or paid request occurs at import, health checks or corpus indexing.
+
+The model calls `search_policies` and `submit_answer`; defaults are three searches
+and six model calls per turn. State includes messages, evidence, counts and an
+in-memory trace. Errors do not leave a partial turn behind. Separate requests do
+not share messages, evidence or budgets; conversation locks are no longer needed.
+
+Answered policy claims require current-turn retrieved IDs. The server rejects
+unknown IDs, malformed markers and handwritten links, then creates numbered links
+and exact excerpts. This checks provenance, not semantic support. For
+`insufficient_evidence`, conservative localized text replaces model prose. Semantic
+classification and unsupported generalizations remain known model-quality risks.
+
+## API
+
+| Method | Path | Contract |
 | --- | --- | --- |
-| GET | `/api/health` | Process health and implementation stage |
-| GET | `/api/knowledge` | Snapshot SHA, document/chunk counts, parser version |
-| POST | `/api/knowledge/search` | Keyword or hybrid results with immutable source metadata |
+| GET | `/api/health` | Process/configuration status; `conversation_mode=window-memory` |
+| GET | `/api/knowledge` | Source commit, document/chunk counts |
+| POST | `/api/knowledge/search` | `{query, limit}` to inspect ranked evidence |
+| POST | `/api/chat` | `{content, history:[{question,answer}]}` to process one turn |
 
-Search request: `{"query":"appeal a suspension","limit":6}`.
-Search response: `{"retrieval_mode":"keyword","results":[...]}`.
-An unindexed corpus returns 503. Invalid limits/empty query return 422.
+All former `/api/conversations` create/list/get/delete/message routes are removed.
+History fields are bounded (question 1–4,000 chars, answer 1–6,000 chars); role/tool
+fields cannot be injected through the context schema. Empty requests or overlong
+context return 422. Chat responses, including errors, use `Cache-Control: no-store`.
+No cookies or browser local/session storage are used. The frontend blocks duplicate
+submissions and clearing while a request is pending; it aborts and ignores responses
+on page exit. Network retries cannot append to a hidden server-side conversation.
 
-## Implemented conversation API
+## Diagnostics, evaluation and scope
 
-| Method | Path | Meaning |
-| --- | --- | --- |
-| POST | `/api/conversations` | Create a conversation |
-| GET | `/api/conversations` | List conversations |
-| GET | `/api/conversations/{id}` | Messages and citations |
-| DELETE | `/api/conversations/{id}` | Delete messages and associated graph state |
-| POST | `/api/conversations/{id}/messages` | Submit one user turn |
+Responses include model/prompt/corpus metadata, request run ID, counts and latency.
+Run IDs are diagnostic labels, not database keys. No ordinary chat/run/checkpoint
+record is written. Explicit evaluations request a transient trace and write their
+synthetic cases to reports; context resets between scenarios. Corpus copies keep
+evaluation evidence stable.
 
-Initial message request: `{"content":"Can I appeal this suspension?"}`.
-Response: `kind`, `answer`, `citations`, `run_id`, `corpus_commit`, `prompt_version`,
-`model`, `provider`, `retrieval_mode`, `model_calls`, `search_calls`, `latency_ms`.
-`run_id` identifies the finalized turn. Citation objects include an answer-local label and
-the immutable evidence fields. The server builds URLs, not the model.
-Start with ordinary JSON responses; add streaming only if needed after validation.
-Conversation listings include the first completed question as `title`, plus
-`turn_count`. Details expose ordered `turns` containing the original question and
-the complete finalized response.
-
-## Frontend and evaluation
-
-The React client sends same-origin `/api` requests through Vite in development and
-Nginx in Compose. No model key is exposed to JavaScript. Sources render as escaped
-plain text, and final-answer labels open their evidence panels. A process-local
-UI request guard prevents duplicate submission and navigation while a turn is active.
-
-`evals/answers.py` validates 45 scenarios with source-text anchors, then optionally
-executes real calls with `--live`. It copies the corpus database into a temporary
-workspace and isolates evaluation chat state. Reports separate automatic structural
-checks from unfilled human semantic reviews. Agent qualitative review is recorded separately in `evals/REVIEW.md`. `evals/README.md` defines the rubric.
-
-## Agent state and controls
-
-- State: messages, current-turn evidence map, search/model-call counts, trace and result.
-- SQLite checkpointer keyed by server-created conversation IDs; separate graph store
-  from corpus tables. Reset evidence/call budget for every user turn.
-- Expose `search_policies(query)` and `submit_answer(kind, answer)`. The second tool
-  is a structured final-output channel. No category filter is implemented yet.
-- The model can reformulate queries and repeat searches, with at most three searches
-  and six model calls per turn by default. A tool batch processes at most four tools.
-- `kind=answered` requires current-turn evidence and inline `[[chunk_id]]` markers.
-  The server validates IDs, assigns `[1]` labels, and supplies source metadata. It
-  rejects unknown IDs, handwritten URLs and malformed citation markers.
-- Greeting, clarification, out-of-scope and insufficient-evidence kinds cannot cite
-  sources. Their semantic classification is still model-controlled; structural
-  checks do not prove grounding or prevent misclassified policy assertions.
-- Treat retrieved text as data. Do not follow embedded instructions or arbitrary URLs.
-- No model initialization or paid request on import, health checks or corpus indexing.
-- Surface missing settings and provider failures as clear errors, never fabricated answers.
-
-Execution: `START → decide → execute → decide/finalize → END`.
-Tool and model outputs are checkpointed in `checkpoints.sqlite3`. Canonical completed
-turns and run metadata live in `conversations.sqlite3`; the API loads that history
-and explicitly replaces all graph state before each new turn. A failed run therefore
-cannot inject partially completed tool messages into a retry. Deleted chats remove
-turns, run metadata and their graph checkpoints. SQLite file backups/WAL reclamation
-are outside the application deletion contract.
-
-Within one service process, locks serialize chat/delete requests per conversation.
-Deploy one API worker. The last six completed turns are sent to the model by default;
-full history remains stored. No automatic summarization or authentication is implemented.
-
-## Hybrid retrieval
-
-Embedding input contains document title, heading and source text. Cache identity
-includes provider, model, base URL and input-format version; each vector also records
-its input hash. The manifest stores corpus metadata and dimensions. Builds batch
-requests, reuse matching vectors and replace the cache transactionally after all
-vectors validate. Corpus replacement invalidates the cache.
-
-Query vectors and cached vectors must be finite, nonzero and dimension-compatible.
-Cosine similarity produces the top 20 semantic candidates; FTS5 supplies up to 20
-keyword candidates. Reciprocal rank fusion (`1/(60+rank)`) merges their ranks and
-returns six chunks by default. Hybrid misconfiguration fails explicitly. Similarity
-is not treated as a calibrated confidence score; the agent must inspect the evidence.
-
-
-## Acceptance-driven refinements
-
-The agent search tool takes the normal six ranked seeds and adds up to four adjacent
-chunks from the top three seeds, at most ten chunks per search. Neighbors preserve
-their own immutable citation IDs/lines and carry `retrieval_context=true`. This
-addresses a measured failure where a definition section was returned but the next
-section containing a deadline was missing. The search API and retrieval benchmark
-still use ranked seeds without expansion, keeping the comparison consistent.
-
-Prompt v2 asks for focused alternative searches, short answers and no corpus-wide
-absence claims based on incomplete retrieval. The original question is stored in
-agent state. When the model selects `insufficient_evidence`, the server replaces its
-prose with conservative English/Chinese text to avoid uncited policy assertions.
-Other semantic mistakes, including selecting `answered` for an unavailable date,
-remain possible and are documented in evaluation review.
-
-Compatible embedding requests disable client token-array preprocessing and send
-raw strings with `encoding_format=float`. Batch size is configurable; the tested
-Beijing model uses 20. Provider identity, endpoint, model and dimensions remain part
-of cache compatibility checks. The frontend never receives provider credentials.
+Policy initialization uses `python -m policy_agent.setup {sync,index,embed,status}`.
+There is no CLI chat or resumable terminal conversation. No authentication, admin
+console or automatic summarization is included. Historical live reports and demo
+captures predate this revised window-only interaction model.

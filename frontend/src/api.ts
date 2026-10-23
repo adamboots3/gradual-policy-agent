@@ -23,15 +23,6 @@ export interface Turn {
   question: string;
   response: Answer;
 }
-export interface Conversation {
-  id: string;
-  created_at: string;
-  title?: string;
-  turn_count?: number;
-}
-export interface Detail extends Conversation {
-  turns: Turn[];
-}
 export interface Knowledge {
   commit: string | null;
   documents: number;
@@ -86,17 +77,16 @@ const json = (method: string, body?: unknown): RequestInit => ({
 export const api = {
   health: () => request<Health>("/health"),
   knowledge: () => request<Knowledge>("/knowledge"),
-  conversations: async () =>
-    (await request<{ conversations: Conversation[] }>("/conversations"))
-      .conversations,
-  create: () => request<Conversation>("/conversations", json("POST")),
-  get: (id: string) =>
-    request<Detail>(`/conversations/${encodeURIComponent(id)}`),
-  remove: (id: string) =>
-    request<void>(`/conversations/${encodeURIComponent(id)}`, json("DELETE")),
-  send: (id: string, content: string) =>
-    request<Answer>(
-      `/conversations/${encodeURIComponent(id)}/messages`,
-      json("POST", { content }),
-    ),
+  send: (content: string, turns: Turn[], signal?: AbortSignal) =>
+    request<Answer>("/chat", {
+      ...json("POST", {
+        content,
+        history: turns.slice(-20).map((turn) => ({
+          question: turn.question,
+          answer: turn.response.answer,
+        })),
+      }),
+      signal,
+      cache: "no-store",
+    }),
 };

@@ -1,47 +1,78 @@
 # GitHub Policy Support Agent
 
-A take-home assignment: a conversational assistant grounded in a pinned snapshot of
-[GitHub's policy repository](https://github.com/github/site-policy).
+A web-based policy support assistant built with LangChain, LangGraph, FastAPI and
+React/TypeScript, grounded in a pinned snapshot of [GitHub policies](https://github.com/github/site-policy).
 
-Submission repository: [adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent)
-(private, default branch `main`). Reviewers need repository access and their own
-model API keys; credentials and local conversation data are excluded.
+Repository: [adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent)
+(private; reviewers need access). See [results](docs/RESULTS.md) for real evaluation
+reports and known answer-quality limitations.
+
+## Temporary conversations, web access only
+
+Chat context lives only in the current page's memory. Follow-ups in that window
+carry completed question/answer pairs to the server. New tabs/windows start empty.
+Closing, navigating away, refreshing, or choosing **New conversation** discards the
+current chat. There is no history list, resume endpoint, browser storage, server
+conversation database, or persistent graph checkpointer. Failed questions remain
+editable in the current window and are excluded from follow-up context.
+
+The only end-user interface is the web client. The former CLI chat and its console
+entry point were removed. The initialization module below only prepares/inspects the
+policy library; it is not a conversation interface. Policy documents, indexes and
+embedding vectors remain on disk. The application does not save ordinary chat text
+or tool traces. Explicit evaluation commands still write synthetic test reports.
+
+## Native setup
+
+Requirements: Python 3.12, Git, [uv](https://docs.astral.sh/uv/getting-started/installation/),
+and Node.js 24. Run backend commands from the repository root.
 
 ```sh
 git clone https://github.com/adamboots3/gradual-policy-agent.git
 cd gradual-policy-agent
+uv sync --locked --all-extras
+uv run python -m policy_agent.setup sync
+uv run python -m policy_agent.setup index
+uv run python -m policy_agent.setup status
 ```
 
-**Current status:** a LangChain/LangGraph conversational backend with keyword or
-hybrid retrieval, durable conversations, bounded search and validated citation IDs.
-An interactive CLI, JSON API, React web UI and source-anchored evaluation suite are
-implemented. The final configuration uses DeepSeek chat and Alibaba embeddings.
-55 backend tests and 6 frontend tests passed; a real 45-scenario / 51-turn run
-completed with valid citation provenance in every turn. Response-kind agreement was
-49/51, which is **not answer accuracy**. Known semantic failures and the retrieval
-comparison are documented in [Results](docs/RESULTS.md). Windows/Linux backend and frontend CI plus the Docker build/start/health smoke
-test all passed. See the [verified run](https://github.com/adamboots3/gradual-policy-agent/actions/runs/39810856851).
+Copy `.env.example` to `.env` using your OS file-copy command. Choose a chat model
+with tool calling; configure provider, model, endpoint and key independently of
+embeddings. Missing configuration is shown explicitly, not replaced by fake answers.
 
-## Run locally
+```dotenv
+POLICY_CHAT_PROVIDER=openai
+POLICY_CHAT_MODEL=YOUR_TOOL_CAPABLE_MODEL
+POLICY_CHAT_BASE_URL=YOUR_COMPATIBLE_API_BASE_URL
+POLICY_CHAT_API_KEY=YOUR_CHAT_KEY
+POLICY_RETRIEVAL_MODE=keyword
+```
 
-Requirements: Python 3.12, Git, and [uv](https://docs.astral.sh/uv/getting-started/installation/).
-Run all commands from the repository root. Windows, macOS and Linux use the same
-`uv run` commands; virtual-environment activation is unnecessary.
+Here `openai` selects LangChain's compatible client, not a fixed model vendor.
+Anthropic chat uses `anthropic`; other integrations require their own locked adapter.
+The optional `POLICY_CHAT_EXTRA_BODY` passes provider-specific options. Model keys
+stay on the backend and must never be committed.
+
+For hybrid retrieval, configure independent `POLICY_EMBEDDING_PROVIDER`,
+`POLICY_EMBEDDING_MODEL`, `POLICY_EMBEDDING_BASE_URL`, `POLICY_EMBEDDING_API_KEY` and
+`POLICY_EMBEDDING_BATCH_SIZE`. Then run:
 
 ```sh
-uv sync --locked
-uv run policy-agent sync
-uv run policy-agent index
-uv run policy-agent search "How can I appeal an account suspension?"
+uv run python -m policy_agent.setup embed
+```
+
+This sends policy text to the selected embedding service and may incur charges.
+After a successful build, set `POLICY_RETRIEVAL_MODE=hybrid`. Changing embedding
+provider, endpoint or model requires a rebuild; re-indexing invalidates vectors.
+Hybrid setup errors fail explicitly instead of silently falling back to keywords.
+
+Start the backend:
+
+```sh
 uv run uvicorn policy_agent.api:app --host 127.0.0.1 --port 8000
 ```
 
-Open <http://localhost:8000/docs> for the API explorer. `GET /api/health` checks the
-server; `GET /api/knowledge` reports the indexed snapshot;
-`POST /api/knowledge/search` accepts `{"query":"appeal reinstatement","limit":6}`.
-Before indexing, search returns HTTP 503 with setup instructions.
-
-For the web interface, install Node.js 24 and open a second terminal:
+In another terminal:
 
 ```sh
 cd frontend
@@ -49,176 +80,82 @@ npm ci --no-audit --no-fund
 npm run dev
 ```
 
-Open <http://localhost:5173>. Vite proxies `/api` to the backend on port 8000; no
-browser-side credentials or CORS setup are needed. The UI shows model/corpus setup
-issues explicitly. Choose a suggested question, submit a message, switch conversations
-or select an inline citation to inspect original policy text. Only successful turns
-are saved; failed questions remain editable. After a network interruption, reopen
-the conversation before resending because the server may have completed the turn.
+Open [the web client](http://localhost:5173). Vite proxies `/api` to port 8000.
+For an alternate development backend, set `POLICY_API_PROXY_TARGET` before starting
+Vite; it is a server-side proxy setting, not a browser credential. Restart existing
+backend/frontend processes after updating from the former persistent-history version.
 
-UI verification: `npm test`, `npm run format:check`, and `npm run build` from
-`frontend/`. Scripts invoke Node directly so Windows directories containing spaces
-or `&` work without relying on problematic command shims. No CDN fonts or runtime
-asset downloads are required. See [UI notes](docs/UI.md).
+The corpus is fixed by `corpus.lock.json` (57 documents / 721 chunks). Sync rejects
+a dirty or mismatched checkout. Source citations use immutable commit URLs and exact
+line ranges; the pinned source can differ from GitHub's currently published policy.
 
-The sync command downloads the public corpus and checks out the commit recorded in
-`corpus.lock.json`. Indexing can run without network access after sync. Sync refuses
-to overwrite a dirty checkout. The generated SQLite database and downloaded source
-are excluded from Git. Do not change the corpus lock without rerunning evaluations.
+## API and context contract
 
-## Verify without API keys
+[API explorer](http://localhost:8000/docs). `GET /api/health` and `/api/knowledge`
+report configuration/corpus status. `POST /api/knowledge/search` searches policy
+text. `POST /api/chat` handles a request with optional window-owned context:
+
+```json
+{
+  "content": "Where should I submit it?",
+  "history": [{"question": "Can I appeal a suspension?", "answer": "Previous completed response"}]
+}
+```
+
+No conversation ID or cookie is required. At most 20 bounded completed pairs are
+accepted; the model receives the last six by default (`POLICY_HISTORY_TURNS`).
+Context is untrusted and is used to interpret follow-ups; policy claims still need
+current-turn retrieval. The response includes answer, citations and diagnostic
+metadata, without saved run records or ordinary tool traces. Chat responses use
+`Cache-Control: no-store`. Configuration failures return 503; provider errors return
+a sanitized 502. The application has no authentication. Stop chat requests before
+replacing the corpus.
+
+## Verify
 
 ```sh
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest
 uv run python -m evals.answers --validate
-uv run python -m evals.retrieval --output evals/reports/retrieval.json
+uv run python -m evals.retrieval --mode keyword
 ```
 
-Tests use temporary synthetic documents, scripted chat responses and deterministic
-embedding doubles to check plumbing and control flow. They make no network/model
-calls. The retrieval evaluation uses the real indexed corpus, so run sync/index
-first. It measures expected-document Recall@6, not factual answer accuracy.
-The initial dataset is small and is a baseline, not a comprehensive eval suite.
-The recorded [baseline report](evals/reports/retrieval-baseline.json) covers 12 English
-questions: every expected document appears among the first six retrieved chunks.
-This is document coverage within chunk results, not section-level evidence accuracy.
+From `frontend/`: `npm test`, `npm run format:check`, `npm run build`. Deterministic
+tests need no model keys. Source-based eval validation requires sync/index first.
+Tests cover temporary context, isolation, failure handling, no conversation files,
+retrieval and citation validation. Scripts invoke Node directly so Windows paths
+containing spaces or `&` work.
 
-The [answer eval suite](evals/README.md) contains 45 source-anchored scenarios and 51
-turns. `--validate` checks cases and source excerpts without paid calls. After model
-setup, use `uv run python -m evals.answers --live --limit 3` for a paid smoke run,
-then omit `--limit` for all scenarios. Reports separate structural checks from
-human-reviewed correctness, grounding and citation support. The committed
-[final live report](evals/reports/answers-hybrid-final.json) contains actual responses,
-citations and traces. [Agent review notes](evals/REVIEW.md) identify remaining
-failures; human review fields remain unfilled. The set is public development data.
+For paid answer evaluation: `uv run python -m evals.answers --live`. Each scenario
+keeps context in process memory only and resets it for the next case. Reports and
+rubric: [eval suite](evals/README.md). Existing 2026-10-22 reports were run before the
+window-memory change; they are historical quality evidence, not reruns of this revision.
+Citation provenance checks do not prove that every claim is supported.
 
-## Model configuration
-
-Copy `.env.example` to `.env` using your OS file-copy command. No secret is required
-for corpus indexing, keyword search or tests. Real conversations require a provider
-key and a chat model supporting tool calling. Provider and model selection are not
-predefined. The lazy factories use LangChain's `init_chat_model` and `init_embeddings`.
-
-Install provider adapters with `uv sync --locked --all-extras` (or just
-`--extra compatible` / `--extra anthropic`). The compatible extra installs
-`langchain-openai`; the Anthropic extra installs `langchain-anthropic` for chat.
-Other providers require adding and locking their own LangChain integration.
-
-Set `POLICY_CHAT_PROVIDER` to the LangChain provider identifier, `POLICY_CHAT_MODEL`
-to a tool-capable model you have access to, and `POLICY_CHAT_API_KEY` to its key.
-For a compatible endpoint, use provider identifier `openai` and configure
-`POLICY_CHAT_BASE_URL` to that endpoint's API base URL. The endpoint must support
-function/tool calling; a text-only completion endpoint is insufficient.
-Anthropic chat uses provider identifier `anthropic`. Endpoint/model compatibility
-still requires a real smoke test once your provider has been selected.
-
-For DeepSeek's official compatible endpoint, the tested configuration is:
-
-```dotenv
-POLICY_CHAT_PROVIDER=openai
-POLICY_CHAT_MODEL=deepseek-flash
-POLICY_CHAT_BASE_URL=https://api.deepseek.com
-POLICY_CHAT_API_KEY=YOUR_DEEPSEEK_KEY
-POLICY_CHAT_EXTRA_BODY={"thinking":{"type":"disabled"}}
-POLICY_RETRIEVAL_MODE=keyword
-```
-
-Here `openai` selects LangChain's compatible client; requests go to the configured
-DeepSeek endpoint. Non-thinking mode avoids relying on vendor-specific reasoning
-history handling during tool calls. See [DeepSeek setup](https://api-docs.deepseek.com/zh-cn/)
-and [thinking-mode guidance](https://api-docs.deepseek.com/guides/thinking_mode/).
-The complete live evaluation and a Chinese two-turn browser demonstration used
-this endpoint; see [actual demo](docs/DEMO.md) and [results](docs/RESULTS.md).
-
-```sh
-uv run policy-agent chat
-# To resume a printed conversation ID:
-uv run policy-agent chat --conversation YOUR_CONVERSATION_ID
-```
-
-Type `/exit` to quit. CLI responses print numbered citation links. The API offers
-conversation create/list/get/delete endpoints and a message endpoint documented in
-`/docs`. Missing configuration returns HTTP 503; upstream failures return a sanitized
-502. Failed turns are not inserted into the user-facing dialogue history.
-
-For hybrid retrieval, configure the independent `POLICY_EMBEDDING_*` settings, then:
-
-The tested Alibaba Bailian configuration uses the **Beijing** region. Keep this key
-separate from the DeepSeek chat key:
-
-```dotenv
-POLICY_EMBEDDING_PROVIDER=openai
-POLICY_EMBEDDING_MODEL=qwen3.7-text-embedding-flash
-POLICY_EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-POLICY_EMBEDDING_API_KEY=YOUR_BEIJING_BAILIAN_KEY
-POLICY_EMBEDDING_BATCH_SIZE=20
-```
-
-The compatible adapter sends raw text and requests float vectors. All 721 chunks
-were embedded successfully with 1,024 dimensions. Other regions/models may require
-a different URL or batch limit; configure the endpoint matching your own key.
-
-```sh
-uv run policy-agent embed
-```
-
-Set `POLICY_RETRIEVAL_MODE=hybrid` in `.env` after the embedding build succeeds.
-This command sends the policy text to the embedding provider and can incur charges.
-It batches requests and reuses a matching existing cache. Changing provider, model
-or base URL requires rebuilding. Re-indexing policies invalidates the vector cache.
-Hybrid mode fails explicitly if the index is missing or incompatible; it does not
-silently fall back to keyword search. Keyword mode remains an English baseline;
-the agent is prompted to formulate English search queries for it.
-
-Never commit `.env`, API keys or private conversation data. Conversations, run
-traces and graph checkpoints are stored under `data/` and excluded from Git.
-
-## Docker (full stack)
+## Docker
 
 ```sh
 docker compose up --build
-docker compose run --rm backend uv run --no-sync policy-agent sync
-docker compose run --rm backend uv run --no-sync policy-agent index
-# If .env enables hybrid retrieval:
-docker compose run --rm backend uv run --no-sync policy-agent embed
-docker compose run --rm backend uv run --no-sync python -m evals.answers --validate
+docker compose run --rm backend uv run --no-sync python -m policy_agent.setup sync
+docker compose run --rm backend uv run --no-sync python -m policy_agent.setup index
+# If hybrid retrieval is configured:
+docker compose run --rm backend uv run --no-sync python -m policy_agent.setup embed
 ```
 
-The web interface is available at <http://localhost:8080>; the API explorer remains
-available at <http://localhost:8000/docs>. Nginx forwards `/api` to the backend.
-Corpus, index, conversations and checkpoints persist in a
-named volume. Both optional provider integrations are installed in the image;
-Compose reads `.env` at runtime if present (Compose 2.24+). No credentials are
-embedded in the image. Docker is an alternative to the native steps. The frontend
-image installs from its npm lockfile. GitHub Actions successfully built and started
-both containers and checked the frontend and proxied health endpoint. This smoke
-test does not execute containerized corpus sync/index or live model requests; native
-Windows verification covers those paths. Docker is unavailable on the development host.
+Web: [localhost:8080](http://localhost:8080); API: port 8000. The named volume stores
+only the policy library/index; conversations are not written there. Compose reads
+`.env` at runtime (Compose 2.24+); keys are not embedded in images. Previous CI
+passed Windows/Linux checks and Docker build/start/health for revision `b8af71c`;
+current revision verification is recorded separately in [verification](docs/VERIFICATION.md).
 
-Run one API worker: per-conversation serialization currently uses process-local locks.
-Stop the server before replacing the corpus. Chat keeps the last six completed turns
-by default (`POLICY_HISTORY_TURNS`); older turns remain visible in stored history but
-are not sent to the model. The local application has no authentication.
+## Documentation
 
-Citation validation checks provenance and syntax, not whether every claim is actually
-supported. Non-policy response kinds (greeting, clarification, out-of-scope and
-insufficient-evidence) are model classifications; semantic misuse of those kinds and
-prompt-injection resistance must be assessed in live answer evaluations.
+- [Architecture and numbered sequence](docs/ARCHITECTURE.md)
+- [Current scope and plan](docs/PLAN.md)
+- [UI behavior](docs/UI.md)
+- [Acceptance checklist](docs/ACCEPTANCE.md)
+- [Historical live demo](docs/DEMO.md), [results](docs/RESULTS.md), [semantic review](evals/REVIEW.md)
 
-## Project notes
-
-- [Implementation plan](docs/PLAN.md): scope, milestones, acceptance checks and status.
-- [Architecture and contracts](docs/ARCHITECTURE.md): state, API and evidence design.
-- [Verification record](docs/VERIFICATION.md): executed checks and remaining limitations.
-- [Results and limitations](docs/RESULTS.md): real runs, retrieval comparison and known failures.
-- [Live demonstration](docs/DEMO.md): Chinese follow-up with source links and screenshots.
-- [Submission checklist](docs/ACCEPTANCE.md): repository delivery and remaining review steps.
-- `.github/workflows/ci.yml`: Windows/Linux installs, backend and frontend tests,
-  production build, and Linux container smoke checks.
-
-The repository snapshot is the assignment's evidence source. It may differ from
-GitHub's live policy documentation. Relative links and Liquid template expressions
-inside the original Markdown are preserved rather than represented as rendered
-documentation. Citations link to the exact repository version and original lines.
+Never commit `.env`, provider keys or private data. The specific providers used in
+historical evaluations are recorded for reproducibility, not required defaults.

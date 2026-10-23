@@ -1,18 +1,19 @@
-# Acceptance audit — updated 2026-10-23 (Asia/Shanghai)
+# Acceptance audit — updated 2026-10-24 (Asia/Shanghai)
 
 Core assignment features, local verification and private GitHub delivery are complete.
-All five GitHub Actions jobs passed for source revision `b8af71c`. Known model-quality
+All five GitHub Actions jobs passed for baseline source revision `b8af71c`; the
+window-memory/web-only revision has separate local checks recorded in VERIFICATION.md. Known model-quality
 limitations and independent semantic review remain documented.
 
 | Requirement | Implementation and executed evidence | Remaining limitation |
 | --- | --- | --- |
 | Policy-grounded support | Pinned 57-document corpus; hybrid retrieval; 51 real answer turns | Semantic review found overstatements; see `evals/REVIEW.md` |
-| Multi-turn | Six two-turn eval scenarios; persistent history; actual Chinese browser follow-up | One trademark follow-up unnecessarily refused |
+| Multi-turn | Window-owned temporary context; fresh per-request graph; no persistent history | One trademark follow-up unnecessarily refused |
 | Source citations | Exact immutable GitHub lines, excerpts, IDs checked; all 51 turns passed provenance validation | Valid provenance does not prove claim support |
-| CLI or web interface | Both implemented; six UI tests, production build, actual browser/source interaction | Browser QA at 614px width; desktop visual QA not performed |
+| Web interface | Web chat only; CLI chat removed by revised user scope; window isolation/reset tests | 1280×720 temporary-chat flow and reset verified; latest narrow-screen behavior covered by responsive CSS/component checks |
 | Evaluation suite | 45 scenarios, 51 turns, 36 anchors; three complete real runs and retrieval comparison | Public development set; independent human review not completed |
 | Agent framework | LangChain provider/tools + bounded LangGraph state machine | One process/worker; no production authentication |
-| Reproducible environment | Python/npm locks, clean environment install, installed-wheel regression: 55 tests | Windows/Linux CI and Docker build/start/health passed; containerized corpus/model execution untested |
+| Reproducible environment | Python/npm locks; new clean environment without SQLite checkpointer; 63 backend tests and 11 frontend tests passed | Windows/Linux CI and Docker build/start/health passed; containerized corpus/model execution untested |
 | GitHub submission | Private `adamboots3/gradual-policy-agent`, `main`, source revision `b8af71c` uploaded | Reviewers need private-repository access |
 
 ## Delivery evidence

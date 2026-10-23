@@ -1,40 +1,34 @@
-# Web interface
+# Web interface — temporary conversations
 
-The React/TypeScript client is under `frontend/`. Vite provides development serving
-and the API proxy; the production build is static and the Compose frontend image
-uses Nginx to forward `/api`. Only the backend reads model credentials.
+The React/TypeScript web client is the only conversation interface. It uses Vite's
+API proxy in development and Nginx in Compose. Only the backend reads model keys.
+The sidebar contains policy-library information and a new-chat action; there is no
+history list, saved-conversation picker, restore control or deletion dialog.
 
-The interface uses a quiet green palette, a conversation sidebar, a central chat
-workspace and a source-detail panel. It uses system font fallbacks and local SVG
-icons; it has no remote font or image dependency. On narrow screens the sidebar
-becomes a conversation selector and the source panel opens over the chat.
+- Completed turns are held only in the current page's React memory. Follow-ups send
+  their question/answer context to `/api/chat`. They never send saved conversation IDs.
+- New windows/tabs are empty. Closing, navigating away, refreshing or choosing New
+  conversation clears the chat. No localStorage, sessionStorage or cookie is used.
+- Page exit cancels the browser request and discards late results. Request state and
+  partial failures are not persisted on the server.
+- Suggestions only populate the composer. Enter sends; Shift+Enter adds a newline;
+  IME composition does not submit. Pending requests disable duplicates/new chat.
+- Failed questions remain editable; only completed turns enter later context.
+- Citation selection shows exact policy excerpts, headings, line ranges and fixed
+  source links. Answer/source text is escaped rather than rendered as HTML.
+- Model setup, empty-library and server errors remain visible and recoverable.
 
-Implemented interactions:
-
-- Suggested questions populate the composer without sending automatically.
-- Enter submits, Shift+Enter adds a line, and IME composition is preserved.
-- New conversations are created lazily on the first submitted question.
-- Conversation titles come from the first completed user turn; empty chats stay untitled.
-- Pending requests disable navigation and duplicate submission. Failed questions
-  return to the composer; uncertain network outcomes prompt reopening history.
-- Clicking a citation opens the exact original Markdown excerpt, heading, line range,
-  fixed commit and original GitHub link. Text is rendered as text rather than raw HTML.
-- Deletion shows a confirmation dialog with keyboard focus containment and Escape.
-- Missing configuration and unreachable-server states are visible and retryable.
-
-Validation performed with mocked API responses: six component tests cover suggestions,
-follow-ups, source rendering, safe text display, deletion, retry, duplicate prevention
-and initial server failures. Production build includes TypeScript checks.
-
-The browser was also checked against the actual local backend in a narrow viewport:
-corpus/setup status, suggested-question input, real missing-provider error, and
-preservation of the failed question. A flex-layout issue hiding the header was found
-and corrected during this check. Generated QA conversation data was removed.
-A subsequent real DeepSeek/Bailian run verified two Chinese turns, citation
-selection (including Community Guidelines lines 66–68), and reopening the saved
-conversation after a page refresh. See the actual transcript in `DEMO.md`. No screenshots of fabricated model answers are used.
-
-![Narrow-screen preview with model setup pending](screenshots/policy-desk.jpg)
+Tests cover in-window follow-ups, independent mounted windows, remount reset, new
+chat reset, page exit during generation, retry, duplicate prevention, source rendering,
+API context bounds and offline behavior. Prior screenshots showing persistent chat
+history are historical and are superseded by the current design.
 
 
-![Real Chinese follow-up and original policy excerpt](screenshots/live-followup.jpg)
+Browser acceptance on 2026-10-24 used a 1280×720 viewport: a real Chinese appeal
+question and follow-up completed, a second tab started empty, refreshing cleared
+both turns, and closing/reopening started empty. The input remained usable and
+citation excerpts were visible. These captures show real API responses:
+
+![Temporary chat with real follow-up](screenshots/window-memory-chat.jpg)
+
+![Newly opened empty window](screenshots/window-memory-empty.jpg)

@@ -2,8 +2,9 @@ from pathlib import Path
 
 import pytest
 import yaml
+from langchain_core.messages import HumanMessage
+from policy_agent.chat import ChatService
 from policy_agent.config import Settings
-from policy_agent.conversations import ConversationService
 from policy_agent.ingestion import git
 
 from evals.answers import Dataset, evaluate, load_dataset, structural_checks
@@ -46,26 +47,42 @@ def test_source_anchored_dataset_and_scripted_execution(corpus, tmp_path):
     dataset, anchors = load_dataset(path, corpus[0])
     assert anchors["appeal"]["start_line"] == 6
     model = ScriptedModel(call("search_policies", query="appeals"), cited_answer)
-    service = ConversationService(Settings(data_dir=corpus[1].parent), lambda _: model)
-    existing = service.create()["id"]
+    service = ChatService(Settings(data_dir=corpus[1].parent), lambda _: model)
     report = evaluate(dataset, anchors, service)
     turn = report[0]["turns"][0]
     assert turn["checks"]["citation_provenance"]
     assert turn["checks"]["reference_anchor_coverage"] == 1
     assert turn["human_review"]["correctness"] is None
-    assert [row["id"] for row in service.list()] == [existing]
+    assert turn["trace"]
+    assert not (corpus[1].parent / "conversations.sqlite3").exists()
 
 
 def test_eval_failure_skips_dependent_followups_and_cleans_up(corpus, tmp_path):
     dataset, anchors = load_dataset(fixture_dataset(corpus, tmp_path), corpus[0])
     dataset.cases[0].turns.append(dataset.cases[0].turns[0].model_copy())
     model = ScriptedModel(RuntimeError("test transport error"))
-    service = ConversationService(Settings(data_dir=corpus[1].parent), lambda _: model)
+    service = ChatService(Settings(data_dir=corpus[1].parent), lambda _: model)
     results = evaluate(dataset, anchors, service)
     assert results[0]["expected_turns"] == 2
     assert len(results[0]["turns"]) == 1
     assert results[0]["turns"][0]["error_type"] == "RuntimeError"
-    assert service.list() == []
+    assert not (corpus[1].parent / "conversations.sqlite3").exists()
+
+
+def test_eval_context_is_temporary_and_resets_between_scenarios(corpus, tmp_path):
+    dataset, anchors = load_dataset(fixture_dataset(corpus, tmp_path), corpus[0])
+    independent = dataset.cases[0].model_copy(deep=True, update={"id": "independent"})
+    dataset.cases[0].turns.append(dataset.cases[0].turns[0].model_copy())
+    dataset.cases.append(independent)
+    models = [
+        ScriptedModel(call("search_policies", query="appeals"), cited_answer) for _ in range(3)
+    ]
+    remaining = iter(models)
+    service = ChatService(Settings(data_dir=corpus[1].parent), lambda _: next(remaining))
+    results = evaluate(dataset, anchors, service)
+    assert len(results[0]["turns"]) == 2 and len(results[1]["turns"]) == 1
+    assert len([m for m in models[1].inputs[0] if isinstance(m, HumanMessage)]) == 2
+    assert len([m for m in models[2].inputs[0] if isinstance(m, HumanMessage)]) == 1
 
 
 def test_corrupted_citation_does_not_pass_provenance(corpus, tmp_path):

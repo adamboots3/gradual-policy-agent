@@ -1,0 +1,85 @@
+"""Request-scoped chat: callers own temporary context; no dialogue is stored."""
+
+import time
+from collections.abc import Sequence
+from typing import Annotated
+from uuid import uuid4
+
+from langchain_core.messages import AIMessage, HumanMessage
+from pydantic import BaseModel, ConfigDict, StringConstraints
+
+from policy_agent.agent import PROMPT_VERSION, build_agent
+from policy_agent.config import Settings
+from policy_agent.providers import ConfigurationError, create_chat
+from policy_agent.retrieval import corpus_status
+from policy_agent.semantic import Retriever
+
+
+class HistoryTurn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
+    ]
+    answer: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=6000)]
+
+
+class ChatService:
+    def __init__(self, settings: Settings, model_factory=create_chat, retriever=None):
+        self.settings = settings
+        self.model_factory = model_factory
+        self.retriever = retriever or Retriever(settings)
+
+    def chat(
+        self,
+        question: str,
+        history: Sequence[HistoryTurn] = (),
+        *,
+        include_trace: bool = False,
+    ) -> dict:
+        if not question.strip() or len(question) > 4000:
+            raise ValueError("Question must contain 1–4000 characters.")
+        if len(history) > 20:
+            raise ValueError("At most 20 completed context turns are accepted.")
+        corpus = corpus_status(self.settings.database)
+        if not corpus["chunks"]:
+            raise ConfigurationError("Knowledge base is empty. Run sync and index first.")
+        messages = []
+        for turn in history[-self.settings.history_turns :]:
+            turn = HistoryTurn.model_validate(turn)
+            messages.extend([HumanMessage(content=turn.question), AIMessage(content=turn.answer)])
+        messages.append(HumanMessage(content=question.strip()))
+        started = time.perf_counter()
+        # Every invocation starts fresh, without a checkpointer or shared dialogue state.
+        graph = build_agent(
+            self.model_factory(self.settings), self.retriever, self.settings.max_search_calls
+        )
+        state = graph.invoke(
+            {
+                "messages": messages,
+                "evidence": {},
+                "search_calls": 0,
+                "model_calls": 0,
+                "result": {},
+                "trace": [],
+                "question": question.strip(),
+            },
+            {"recursion_limit": 40},
+        )
+        if corpus != corpus_status(self.settings.database):
+            raise ConfigurationError("Corpus changed during this turn. Please retry.")
+        result = {
+            **state["result"],
+            "run_id": str(uuid4()),
+            "corpus_commit": corpus["commit"],
+            "prompt_version": PROMPT_VERSION,
+            "model": self.settings.chat_model,
+            "provider": self.settings.chat_provider,
+            "retrieval_mode": self.settings.retrieval_mode,
+            "latency_ms": round((time.perf_counter() - started) * 1000),
+            "model_calls": state["model_calls"],
+        }
+        if include_trace:
+            # Explicit evaluation output only; ordinary chat never saves or returns traces.
+            result["trace"] = state["trace"]
+        return result

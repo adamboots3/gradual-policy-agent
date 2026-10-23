@@ -81,7 +81,7 @@ def validate_answer(value: dict, evidence: dict, search_calls: int) -> dict:
     }
 
 
-def build_agent(model, retriever, max_search_calls: int = 3, checkpointer=None):
+def build_agent(model, retriever, max_search_calls: int = 3):
     @tool(args_schema=SearchInput)
     def search_policies(query: str) -> list[dict]:
         """Search the versioned GitHub policy corpus; returns evidence with citation IDs."""
@@ -216,4 +216,4 @@ def build_agent(model, retriever, max_search_calls: int = 3, checkpointer=None):
     graph.add_edge("decide", "execute")
     graph.add_conditional_edges("execute", route, ["decide", "finalize"])
     graph.add_edge("finalize", END)
-    return graph.compile(checkpointer=checkpointer)
+    return graph.compile()

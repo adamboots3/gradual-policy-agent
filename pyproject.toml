@@ -9,7 +9,6 @@ dependencies = [
   "pydantic-settings>=2.5,<3",
   "langchain>=1,<2",
   "langgraph>=1,<2",
-  "langgraph-checkpoint-sqlite>=3.0.1,<4",
   "pyyaml>=6,<7",
   "numpy>=2,<3",
 ]
@@ -20,9 +19,6 @@ anthropic = ["langchain-anthropic>=1,<2"]
 
 [dependency-groups]
 dev = ["pytest>=8,<10", "httpx>=0.28,<1", "ruff>=0.12,<1"]
-
-[project.scripts]
-policy-agent = "policy_agent.cli:main"
 
 [build-system]
 requires = ["hatchling"]

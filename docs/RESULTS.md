@@ -1,4 +1,7 @@
-# Evaluation results — 2026-10-22
+# Historical evaluation results — 2026-10-22
+
+These real runs predate the 2026-10-24 window-memory/web-only change. They are not
+new answer-quality scores for the current interaction model.
 
 ## Configuration
 
@@ -85,5 +88,5 @@ not independently reconciled. Token metadata is retained when the provider suppl
   sync/index or paid model calls inside the containers. Docker remains absent locally.
 
 Known application limits include model overstatement, occasional false refusals,
-no authentication, one-worker locking, bounded history, a pinned rather than live
+no authentication, bounded model context, a pinned rather than live
 policy snapshot, and citations whose semantic support still needs review.

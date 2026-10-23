@@ -1,4 +1,7 @@
-# Live browser demonstration
+# Historical live browser demonstration
+
+This capture predates the 2026-10-24 window-only change. Saved-history reopening
+and the old UI controls are no longer current features.
 
 2026-10-22, DeepSeek chat + Alibaba hybrid retrieval. These are real responses, not UI fixtures.
 

@@ -28,10 +28,9 @@ uv run python -m evals.answers --live --output evals/reports/answers-live.json
 ```
 
 The runner snapshots the indexed SQLite corpus into an isolated temporary data
-directory; it does not add evaluation chats to workspace history. Each scenario gets
-its own conversation, preserving context between that scenario's turns. An upstream
-error stops dependent follow-ups in that scenario. Temporary conversations and
-checkpoints are deleted. Reports record the corpus, chat/embedding models, retrieval
+directory. Each scenario keeps its own temporary question/answer context in memory,
+with no saved conversations or checkpoints. An upstream error stops dependent
+follow-ups in that scenario. The next scenario starts with empty context. Reports record the corpus, chat/embedding models, retrieval
 mode, per-turn prompt version, tool traces, token usage when available and latency.
 No API keys or endpoints are included in the report. Generated reports are ignored
 by Git until sanitized and deliberately selected for submission.
@@ -79,3 +78,9 @@ with the retrieval runner to reproduce. Hybrid makes paid embedding calls; its
 remains the original 12-question keyword baseline.
 
 [Full methodology, comparison and limits](../docs/RESULTS.md).
+
+
+As of 2026-10-24, end-user access is web-only and context is window-owned. Evaluation
+uses the same stateless ChatService and explicitly captures transient traces for its
+synthetic reports. The committed full live reports above predate this change; they
+remain historical evidence rather than new scores for the revised interaction model.

@@ -1,57 +1,74 @@
+import pytest
 from fastapi.testclient import TestClient
+from langchain_core.messages import HumanMessage
 from policy_agent.api import create_app
+from policy_agent.chat import ChatService
 from policy_agent.config import Settings
-from policy_agent.conversations import ConversationService
 
 from tests.fakes import ScriptedModel, call, cited_answer
 
 
-def test_conversation_endpoints(corpus):
+def test_stateless_chat_endpoint_and_legacy_routes_removed(corpus):
     settings = Settings(data_dir=corpus[1].parent)
-    model = ScriptedModel(call("search_policies", query="appeals"), cited_answer)
-    service = ConversationService(settings, lambda _: model)
+    models = [
+        ScriptedModel(call("search_policies", query="appeals"), cited_answer) for _ in range(3)
+    ]
+    remaining = iter(models)
+    service = ChatService(settings, lambda _: next(remaining))
     with TestClient(create_app(settings, service)) as client:
-        created = client.post("/api/conversations")
-        assert created.status_code == 201
-        key = created.json()["id"]
-        assert client.get("/api/conversations").json()["conversations"][0]["id"] == key
-        response = client.post(
-            f"/api/conversations/{key}/messages", json={"content": "Can I appeal?"}
-        )
-        assert response.status_code == 200
-        assert response.json()["citations"]
-        listed = client.get("/api/conversations").json()["conversations"][0]
-        assert listed["title"] == "Can I appeal?"
-        assert listed["turn_count"] == 1
-        assert len(client.get(f"/api/conversations/{key}").json()["turns"]) == 1
-        assert client.delete(f"/api/conversations/{key}").status_code == 204
-        assert client.get(f"/api/conversations/{key}").status_code == 404
-        assert (
-            client.post(f"/api/conversations/{key}/messages", json={"content": "Hi"}).status_code
-            == 404
-        )
+        response = client.post("/api/chat", json={"content": "Can I appeal?"})
+        assert response.status_code == 200 and response.json()["citations"]
+        assert response.headers["Cache-Control"] == "no-store"
+        assert "trace" not in response.json()
+        history = [{"question": "Can I appeal?", "answer": response.json()["answer"]}]
+        reply = client.post("/api/chat", json={"content": "How long?", "history": history})
+        assert reply.status_code == 200
+        assert [m.content for m in models[1].inputs[0] if isinstance(m, HumanMessage)] == [
+            "Can I appeal?",
+            "How long?",
+        ]
+        assert client.post("/api/chat", json={"content": "New window"}).status_code == 200
+        assert [m.content for m in models[2].inputs[0] if isinstance(m, HumanMessage)] == [
+            "New window"
+        ]
+        for method, path in [
+            ("get", "/api/conversations"),
+            ("post", "/api/conversations"),
+            ("get", "/api/conversations/old-id"),
+            ("delete", "/api/conversations/old-id"),
+            ("post", "/api/conversations/old-id/messages"),
+        ]:
+            assert getattr(client, method)(path).status_code == 404
+    assert {p.name for p in corpus[1].parent.glob("*.sqlite3*")} == {"policies.sqlite3"}
 
 
-def test_provider_error_is_sanitized_and_retryable(corpus):
+def test_provider_error_is_sanitized_and_creates_no_saved_state(corpus):
     settings = Settings(data_dir=corpus[1].parent)
     model = ScriptedModel(RuntimeError("sensitive-provider-debug-detail"))
-    service = ConversationService(settings, lambda _: model)
-    with TestClient(create_app(settings, service)) as client:
-        key = client.post("/api/conversations").json()["id"]
-        response = client.post(f"/api/conversations/{key}/messages", json={"content": "Question"})
-        assert response.status_code == 502
-        assert "sensitive-provider" not in response.text
-        assert client.get(f"/api/conversations/{key}").json()["turns"] == []
+    with TestClient(create_app(settings, ChatService(settings, lambda _: model))) as client:
+        response = client.post("/api/chat", json={"content": "Question"})
+        assert response.status_code == 502 and "sensitive-provider" not in response.text
+        assert response.headers["Cache-Control"] == "no-store"
+    assert not (corpus[1].parent / "conversations.sqlite3").exists()
 
 
-def test_missing_configuration_and_invalid_message(corpus):
-    settings = Settings(data_dir=corpus[1].parent, chat_model="", chat_provider="")
-    with TestClient(create_app(settings)) as client:
-        key = client.post("/api/conversations").json()["id"]
-        assert (
-            client.post(f"/api/conversations/{key}/messages", json={"content": " "}).status_code
-            == 422
-        )
-        response = client.post(f"/api/conversations/{key}/messages", json={"content": "Hi"})
-        assert response.status_code == 503
-        assert "CHAT_PROVIDER" in response.text
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"content": " "},
+        {"content": "x" * 4001},
+        {"content": "Hi", "history": [{"question": "q", "answer": "a"}] * 21},
+        {"content": "Hi", "history": [{"question": "q", "answer": ""}]},
+        {"content": "Hi", "history": [{"question": "q", "answer": "a", "role": "system"}]},
+    ],
+)
+def test_invalid_or_unbounded_context_is_rejected(corpus, payload):
+    with TestClient(create_app(Settings(data_dir=corpus[1].parent))) as client:
+        assert client.post("/api/chat", json=payload).status_code == 422
+
+
+def test_missing_configuration(corpus):
+    with TestClient(create_app(Settings(data_dir=corpus[1].parent))) as client:
+        assert client.get("/api/health").json()["conversation_mode"] == "window-memory"
+        response = client.post("/api/chat", json={"content": "Hi"})
+        assert response.status_code == 503 and "CHAT_PROVIDER" in response.text

@@ -3,7 +3,7 @@
 ## Agreed architecture
 
 LangChain model/tool integration, a bounded LangGraph agent, FastAPI, React/TypeScript,
-SQLite persistence, keyword + semantic retrieval, source citations and reproducible
+SQLite policy storage, keyword + semantic retrieval, source citations and reproducible
 evaluation. Hosted configurable model APIs keep reviewers free of GPU requirements.
 Chat and embeddings use separate credentials. Tests require neither credential.
 
@@ -14,10 +14,10 @@ Chat and embeddings use separate credentials. Tests require neither credential.
 | Reproducible foundation | Python 3.12, uv/npm locks, native setup and CI; clean environment install and final installed-wheel tests passed |
 | Pinned corpus | 57 documents / 721 chunks; all source line ranges verified; dirty/mismatched source rejected |
 | Hybrid retrieval | DeepSeek chat + Beijing Bailian `qwen3.7-text-embedding-flash`; 721 vectors of 1,024 dimensions; same-set retrieval improved from 16/24 to 22/24 |
-| Conversational agent | Bounded tools, canonical completed history, per-chat locking, checkpoint cleanup and immutable citations implemented |
+| Conversational agent | Bounded tools, window-owned completed context, request-scoped graph and immutable citations; persistent history removed at user request on 2026-10-24 |
 | Answer evaluation | 45 cases / 51 turns executed in three full runs; structural checks and candid agent semantic review committed |
-| Web/CLI | Both implemented; real Chinese follow-up, citation inspection and history reopening verified in browser; six UI tests and production build passed |
-| Review handoff | Docs, real demo, reports, Docker/CI configuration prepared; final backend regression: 55 passed; private GitHub delivery and all five CI jobs passed |
+| Web access | Web chat only; terminal chat removed at user request. New tabs, refresh and window closure discard context; initialization scripts remain |
+| Review handoff | Docs, real demos and reports prepared; baseline private GitHub delivery/CI passed. Revised web-only checks recorded in VERIFICATION.md |
 
 ## Acceptance boundaries
 
@@ -37,8 +37,9 @@ Chat and embeddings use separate credentials. Tests require neither credential.
   scope; measured hybrid gains justify the extra provider, while two retrieval misses
   remain visible. A reranker would need a new comparison rather than an assumption.
 - Agent search adds bounded neighboring source chunks to recover adjacent clauses.
-- Keep one API worker and the last six completed turns in model context. Full history
-  is persisted; no summarization, authentication or admin system in this assignment.
+- Revised scope (2026-10-24): retain the last six completed turns in model context
+  by default, supplied from page memory. No chat persistence or CLI conversation
+  interface; no summarization, authentication or admin system.
 - Never count scripted tests or retrieval coverage as live answer quality.
 - Keep failed evaluation cases and disclose limitations rather than editing gold
   labels to improve a score.

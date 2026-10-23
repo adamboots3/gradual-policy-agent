@@ -171,3 +171,44 @@ corpus sync/index and live model calls are outside this smoke check's coverage.
 Source behavior was unchanged after this verified revision; the following handoff
 commit updates only documentation. Earlier statements that remote CI or repository
 creation remained pending are historical and superseded by this entry.
+
+
+## Window-only context and web-only access — 2026-10-24 (Asia/Shanghai)
+
+User-requested scope change: remove persisted conversations and CLI chat. Completed
+pairs live only in React page memory and travel with each `/api/chat` request. New
+windows, refresh, page exit and new-chat discard that state. The server builds a
+fresh graph per request, without checkpointing, conversation tables or run records.
+Former conversation CRUD/resume routes and CLI console entry were removed. Policy
+initialization remains `python -m policy_agent.setup`; policy/vector data is retained.
+
+Executed checks:
+
+- Created a separate environment from the updated lock with all optional adapters;
+  confirmed `langgraph.checkpoint.sqlite` is absent and no `policy-agent` console
+  entry exists. Removed three obsolete packages from the lock; remaining versions
+  were not upgraded.
+- Final backend suite: **63 tests passed in 15.44s** in the clean environment,
+  including all six evaluation regressions. Tests cover
+  explicit bounded context, independent concurrent requests, failed-turn cleanup,
+  no chat files, removed routes, no-store responses and missing configuration.
+- Frontend: 11 tests passed; TypeScript/production build and formatting passed.
+  Covered in-window follow-ups, two independent windows, remount reset, new chat,
+  page exit and late reply suppression, no browser storage writes, failure retry,
+  duplicate prevention, citation rendering and API context serialization/bounds.
+- Dataset validation: 45 scenarios / 51 turns / 36 anchors passed, without paid calls.
+- Real browser at 1280×720: Chinese appeal deadline answered with six months and a
+  real source; follow-up “那应该在哪里提交？” resolved to the appeal form. A new tab,
+  refresh, and closing/reopening all showed an empty chat. Captures are
+  `window-memory-chat.jpg` and `window-memory-empty.jpg`.
+- Used temporary ports 8001/5174 because other existing processes occupied 8000/5173.
+  Stopped only the temporary acceptance servers. Existing processes were not stopped;
+  they need restarting before they can serve the revised source.
+- Legacy conversation/checkpoint files in local data were verified empty. An old
+  running process held a file lock, so they were left untouched; the new implementation
+  never reads or writes them. Fresh environments create no such files.
+
+The complete historical answer-quality suite was not rerun for this transport/state
+change. Its failures remain open; the two-turn smoke check is not a replacement
+quality score. The previous remote CI run applies to the baseline revision, not this
+new local update. No model keys were changed or published.

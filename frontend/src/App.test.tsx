@@ -1,5 +1,7 @@
 import {
+  act,
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -12,15 +14,7 @@ import { api, ApiError, type Answer } from "./api";
 
 vi.mock("./api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./api")>()),
-  api: {
-    health: vi.fn(),
-    knowledge: vi.fn(),
-    conversations: vi.fn(),
-    create: vi.fn(),
-    get: vi.fn(),
-    remove: vi.fn(),
-    send: vi.fn(),
-  },
+  api: { health: vi.fn(), knowledge: vi.fn(), send: vi.fn() },
 }));
 
 const answer: Answer = {
@@ -46,12 +40,6 @@ const answer: Answer = {
     },
   ],
 };
-const conversation = {
-  id: "chat-1",
-  title: "Saved conversation",
-  created_at: "2026-10-22T10:00:00Z",
-  turn_count: 1,
-};
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -65,22 +53,37 @@ beforeEach(() => {
     documents: 57,
     chunks: 721,
   });
-  vi.mocked(api.conversations).mockResolvedValue([]);
-  vi.mocked(api.create).mockResolvedValue(conversation);
   vi.mocked(api.send).mockResolvedValue(answer);
-  vi.mocked(api.remove).mockResolvedValue(undefined);
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 async function ready() {
-  render(<App />);
-  await screen.findByText("Connected");
+  const view = render(<App />);
+  await within(view.container).findByText("Connected");
+  return view;
 }
 
-describe("Policy Desk", () => {
-  it("shows the library and lets a suggestion populate the composer without sending", async () => {
+async function ask(question: string, container: HTMLElement = document.body) {
+  const view = within(container);
+  await userEvent.type(
+    view.getByRole("textbox", { name: "Ask a policy question" }),
+    question,
+  );
+  await userEvent.click(view.getByRole("button", { name: "Send question" }));
+}
+
+describe("temporary Policy Desk", () => {
+  it("shows the library and suggestion without any history controls", async () => {
     await ready();
     expect(screen.getByText("57 documents")).toBeInTheDocument();
+    expect(screen.getByText("This window only")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("navigation", { name: "Conversation history" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     await userEvent.click(
       screen.getByRole("button", { name: /Appeal an account suspension/ }),
     );
@@ -90,14 +93,16 @@ describe("Policy Desk", () => {
     expect(api.send).not.toHaveBeenCalled();
   });
 
-  it("sends follow-ups in the same conversation and displays safe source excerpts", async () => {
+  it("passes only completed in-window turns to a follow-up and displays safe sources", async () => {
     await ready();
-    const input = screen.getByLabelText("Ask a policy question");
-    await userEvent.type(input, "Can I appeal?");
-    await userEvent.click(
-      screen.getByRole("button", { name: "Send question" }),
-    );
+    await ask("Can I appeal?");
     await screen.findByText("You can submit an appeal.");
+    expect(api.send).toHaveBeenNthCalledWith(
+      1,
+      "Can I appeal?",
+      [],
+      expect.any(AbortSignal),
+    );
     await userEvent.click(
       screen.getByRole("button", { name: "View source 1" }),
     );
@@ -109,55 +114,97 @@ describe("Policy Desk", () => {
       screen.getByRole("link", { name: /Open original on GitHub/ }),
     ).toHaveAttribute("href", answer.citations[0].source_url);
     vi.mocked(api.send).mockResolvedValue({ ...answer, run_id: "run-2" });
-    await userEvent.type(input, "What is the deadline?");
-    await userEvent.click(
-      screen.getByRole("button", { name: "Send question" }),
-    );
+    await ask("What is the deadline?");
     await waitFor(() => expect(api.send).toHaveBeenCalledTimes(2));
     expect(api.send).toHaveBeenLastCalledWith(
-      "chat-1",
       "What is the deadline?",
+      [{ question: "Can I appeal?", response: answer }],
+      expect.any(AbortSignal),
     );
-    expect(api.create).toHaveBeenCalledTimes(1);
   });
 
-  it("restores a conversation and deletes it after a reviewable confirmation", async () => {
-    vi.mocked(api.conversations).mockResolvedValue([conversation]);
-    vi.mocked(api.get).mockResolvedValue({
-      ...conversation,
-      turns: [{ question: "Old question", response: answer }],
-    });
+  it("starts a remounted window empty and writes no browser storage", async () => {
+    const save = vi.spyOn(Storage.prototype, "setItem");
+    const first = await ready();
+    await ask("Temporary question");
+    await screen.findByText("You can submit an appeal.");
+    first.unmount();
     await ready();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Saved conversation" }),
+    expect(screen.queryByText("Temporary question")).not.toBeInTheDocument();
+    await ask("A fresh window");
+    await screen.findByText("You can submit an appeal.");
+    expect(api.send).toHaveBeenLastCalledWith(
+      "A fresh window",
+      [],
+      expect.any(AbortSignal),
     );
-    await screen.findByText("Old question");
-    await userEvent.click(
-      screen.getByRole("button", { name: "Delete Saved conversation" }),
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("isolates two open windows", async () => {
+    const a = await ready();
+    await ask("Window A secret", a.container);
+    await within(a.container).findByText("You can submit an appeal.");
+    const b = await ready();
+    await ask("Window B question", b.container);
+    await within(b.container).findByText("You can submit an appeal.");
+    expect(api.send).toHaveBeenLastCalledWith(
+      "Window B question",
+      [],
+      expect.any(AbortSignal),
     );
-    const dialog = screen.getByRole("dialog");
-    expect(api.remove).not.toHaveBeenCalled();
+    expect(
+      within(b.container).queryByText("Window A secret"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("new chat clears the current context and source selection", async () => {
+    await ready();
+    await ask("Clear this question");
+    await screen.findByText("You can submit an appeal.");
     await userEvent.click(
-      within(dialog).getByRole("button", { name: "Delete conversation" }),
+      screen.getByRole("button", { name: /New conversation ↗/ }),
     );
-    await waitFor(() => expect(api.remove).toHaveBeenCalledWith("chat-1"));
-    await waitFor(() =>
-      expect(screen.queryByText("Old question")).not.toBeInTheDocument(),
+    expect(screen.queryByText("Clear this question")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /Open original on GitHub/ }),
+    ).not.toBeInTheDocument();
+    await ask("Start over");
+    await screen.findByText("You can submit an appeal.");
+    expect(api.send).toHaveBeenLastCalledWith(
+      "Start over",
+      [],
+      expect.any(AbortSignal),
     );
   });
 
-  it("keeps a failed question editable and retries without creating another conversation", async () => {
+  it("page exit clears context and discards a late reply", async () => {
+    let resolve!: (value: Answer) => void;
+    vi.mocked(api.send).mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    await ready();
+    await ask("Pending before exit");
+    const signal = vi.mocked(api.send).mock.calls[0][2]!;
+    fireEvent(window, new Event("pagehide"));
+    expect(signal.aborted).toBe(true);
+    await act(async () => {
+      resolve(answer);
+    });
+    expect(screen.queryByText("Pending before exit")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("You can submit an appeal."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps failed questions editable and excludes them from retry context", async () => {
     vi.mocked(api.send)
       .mockRejectedValueOnce(new ApiError("Provider unavailable", 502))
       .mockResolvedValueOnce(answer);
     await ready();
-    await userEvent.type(
-      screen.getByLabelText("Ask a policy question"),
-      "Retry this question",
-    );
-    await userEvent.click(
-      screen.getByRole("button", { name: "Send question" }),
-    );
+    await ask("Retry this question");
     await screen.findByRole("alert");
     expect(screen.getByLabelText("Ask a policy question")).toHaveValue(
       "Retry this question",
@@ -167,11 +214,14 @@ describe("Policy Desk", () => {
       screen.getByRole("button", { name: "Send question" }),
     );
     await screen.findByText("You can submit an appeal.");
-    expect(api.create).toHaveBeenCalledTimes(1);
-    expect(api.send).toHaveBeenCalledTimes(2);
+    expect(api.send).toHaveBeenLastCalledWith(
+      "Retry this question",
+      [],
+      expect.any(AbortSignal),
+    );
   });
 
-  it("prevents duplicate submits and conversation changes during generation", async () => {
+  it("prevents duplicate submissions and clearing during generation", async () => {
     let resolve!: (value: Answer) => void;
     vi.mocked(api.send).mockReturnValue(
       new Promise((done) => {
@@ -191,11 +241,13 @@ describe("Policy Desk", () => {
     expect(
       screen.getByRole("button", { name: /New conversation ↗/ }),
     ).toBeDisabled();
-    resolve(answer);
+    await act(async () => {
+      resolve(answer);
+    });
     await screen.findByText("You can submit an appeal.");
   });
 
-  it("shows a recoverable offline error without fabricating library data", async () => {
+  it("shows a recoverable offline error without fabricated library data", async () => {
     vi.mocked(api.health).mockRejectedValue(
       new ApiError("Cannot reach the server", 0),
     );

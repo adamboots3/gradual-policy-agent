@@ -145,12 +145,12 @@ class Retriever:
             ]
         if not raw:
             raise ConfigurationError(
-                "Hybrid mode requires an embedding index. Run policy-agent embed."
+                "Hybrid mode requires an embedding index. Run python -m policy_agent.setup embed."
             )
         meta = json.loads(raw[0])
         if meta["fingerprint"] != fingerprint(self.settings):
             raise ConfigurationError(
-                "Embedding configuration changed. Rebuild with policy-agent embed."
+                "Embedding configuration changed. Rebuild with python -m policy_agent.setup embed."
             )
         if meta["corpus"] != corpus_status(self.settings.database) or len(rows) != meta["chunks"]:
             raise ConfigurationError("Embedding index does not match the corpus. Rebuild it.")

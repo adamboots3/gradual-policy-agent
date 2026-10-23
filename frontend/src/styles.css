@@ -121,58 +121,20 @@ button svg {
 .new-chat:hover:not(:disabled) {
   border-color: #a0b59c;
 }
-.history-heading {
-  font-size: 9px;
-  letter-spacing: 1.3px;
-  color: #879181;
-  display: flex;
-  justify-content: space-between;
-  margin: 33px 9px 14px;
-}
-.history-heading span {
-  font-size: 10px;
-}
-.conversation-list {
-  overflow: auto;
+.session-info {
   flex: 1;
-  min-height: 80px;
+  padding: 30px 9px 12px;
+  color: #6b7d62;
 }
-.no-conversations {
+.session-info strong {
+  display: block;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.session-info p {
   font-size: 12px;
-  color: #8b9587;
-  padding: 0 10px;
   line-height: 1.8;
 }
-.conversation-item {
-  display: flex;
-  border-radius: 7px;
-  margin: 3px 0;
-  align-items: center;
-}
-.conversation-item.selected {
-  background: #e2e9dd;
-}
-.conversation-select {
-  border: 0;
-  background: none;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-  flex: 1;
-  text-align: left;
-  padding: 11px 8px;
-  font-size: 12px;
-}
-.conversation-select span {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.conversation-select svg {
-  color: #85957e;
-}
-.delete-button,
 .icon-button {
   display: grid;
   place-items: center;
@@ -182,7 +144,6 @@ button svg {
   padding: 7px;
   color: #84907e;
 }
-.delete-button:hover,
 .icon-button:hover {
   background: #dce3d5;
   color: #324c36;
@@ -827,55 +788,6 @@ button svg {
   color: inherit;
   padding: 2px;
 }
-.dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  background: #1d342d50;
-  display: grid;
-  place-items: center;
-  z-index: 20;
-  padding: 20px;
-  backdrop-filter: blur(3px);
-}
-.confirm-dialog {
-  background: #fcfdf9;
-  border: 1px solid #e0e7d8;
-  border-radius: 15px;
-  padding: 28px;
-  max-width: 430px;
-  box-shadow: 0 15px 80px #15302020;
-}
-.confirm-dialog > svg {
-  color: #9a765e;
-}
-.confirm-dialog h2 {
-  font:
-    650 19px "Manrope",
-    sans-serif;
-}
-.confirm-dialog p {
-  font-size: 12px;
-  color: #85927c;
-  line-height: 1.8;
-}
-.confirm-dialog > div {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  margin-top: 22px;
-}
-.confirm-dialog button {
-  border: 1px solid #dce4d5;
-  background: #f5f8f0;
-  border-radius: 6px;
-  padding: 9px 12px;
-  font-size: 11px;
-}
-.confirm-dialog .danger {
-  background: #9d6850;
-  color: #fff;
-  border-color: #9d6850;
-}
 .spin {
   animation: spin 1s linear infinite;
 }
@@ -1059,34 +971,31 @@ button svg {
     scroll-behavior: auto !important;
   }
 }
-.mobile-conversations {
+.mobile-session {
   display: none;
+  flex-shrink: 0;
 }
 @media (max-width: 700px) {
-  .mobile-conversations {
+  .mobile-session {
     display: flex;
-    gap: 8px;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
     padding: 10px 16px;
     border-bottom: 1px solid var(--line);
     background: #f5f8f0;
+    font-size: 11px;
   }
-  .mobile-conversations select {
-    font: 11px inherit;
+  .mobile-session button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
     padding: 7px;
-    min-width: 0;
-    flex: 1;
     border: 1px solid #dce4d5;
     border-radius: 5px;
     background: #fcfdf9;
-    color: #607353;
-  }
-  .mobile-conversations button {
-    display: grid;
-    place-items: center;
-    width: 31px;
-    border: 1px solid #dce4d5;
-    border-radius: 5px;
-    background: #fcfdf9;
+    font-size: 11px;
   }
   .composer-bottom {
     gap: 5px;
@@ -1095,7 +1004,4 @@ button svg {
 .main-panel,
 .chat-scroll {
   min-height: 0;
-}
-.mobile-conversations {
-  flex-shrink: 0;
 }
