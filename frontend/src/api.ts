@@ -1,6 +1,6 @@
 export interface Citation {
   label: number;
-  chunk_id: string;
+  source_id: string;
   title: string;
   heading: string;
   content: string;
@@ -15,23 +15,23 @@ export interface Answer {
   answer: string;
   citations: Citation[];
   run_id: string;
-  corpus_commit: string;
-  search_calls: number;
+  source_commit: string | null;
+  read_calls: number;
   latency_ms: number;
 }
 export interface Turn {
   question: string;
   response: Answer;
 }
-export interface Knowledge {
-  commit: string | null;
-  documents: number;
-  chunks: number;
+export interface PolicySource {
+  repository: string;
+  ref: string;
+  source_mode: string;
 }
 export interface Health {
   status: string;
   chat_configured: boolean;
-  retrieval_mode: string;
+  source_mode: string;
 }
 
 export class ApiError extends Error {
@@ -76,7 +76,7 @@ const json = (method: string, body?: unknown): RequestInit => ({
 
 export const api = {
   health: () => request<Health>("/health"),
-  knowledge: () => request<Knowledge>("/knowledge"),
+  policies: () => request<PolicySource>("/policies"),
   send: (content: string, turns: Turn[], signal?: AbortSignal) =>
     request<Answer>("/chat", {
       ...json("POST", {

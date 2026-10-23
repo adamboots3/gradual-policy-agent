@@ -1,7 +1,9 @@
 # Historical evaluation results — 2026-10-22
 
 These real runs predate the 2026-10-24 window-memory/web-only change. They are not
-new answer-quality scores for the current interaction model.
+new answer-quality scores for the current online-file-reading architecture.
+The local policy library, embeddings and hybrid search described below were removed
+on 2026-10-24. See VERIFICATION.md and the online evaluation report for current checks.
 
 ## Configuration
 

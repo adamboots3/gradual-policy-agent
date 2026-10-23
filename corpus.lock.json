@@ -1,6 +1,0 @@
-{
-  "repository": "https://github.com/github/site-policy.git",
-  "commit": "b9578b546d2506febda1da2cd7431644d58e512c",
-  "include": "Policies/**/*.md",
-  "parser_version": 1
-}

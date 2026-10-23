@@ -1,42 +1,37 @@
-import pytest
 from fastapi.testclient import TestClient
 from policy_agent.api import create_app
+from policy_agent.chat import ChatService
 from policy_agent.config import Settings
-from policy_agent.retrieval import search
+from policy_agent.github_source import PolicySourceError
+
+from tests.fakes import ScriptedModel, call
 
 
-def test_api_evidence_and_metadata(corpus):
-    _, db, _ = corpus
-    with TestClient(create_app(Settings(data_dir=db.parent))) as client:
-        assert client.get("/api/health").status_code == 200
-        assert client.get("/api/knowledge").json()["documents"] == 1
-        response = client.post("/api/knowledge/search", json={"query": "appeal suspension"})
-        assert response.status_code == 200
-        result = response.json()
-        assert result["retrieval_mode"] == "keyword"
-        assert "reinstatement form" in result["results"][0]["content"]
-        assert result["results"][0]["source_url"].startswith("https://github.com/")
+def test_health_and_source_configuration_need_no_github_or_model_calls(corpus):
+    settings = Settings()
+    service = ChatService(settings, lambda _: None, corpus.factory)
+    with TestClient(create_app(settings, service)) as client:
+        assert client.get("/api/health").json()["source_mode"] == "github-online"
+        assert client.get("/api/policies").json() == {
+            "repository": "https://github.com/github/site-policy",
+            "ref": "HEAD",
+            "source_mode": "github-online",
+        }
+        assert client.get("/api/knowledge").status_code == 404
+        assert client.post("/api/knowledge/search", json={"query": "appeal"}).status_code == 404
+    assert corpus.calls == []
 
 
-def test_unindexed_returns_actionable_error(tmp_path):
-    with TestClient(create_app(Settings(data_dir=tmp_path))) as client:
-        response = client.post("/api/knowledge/search", json={"query": "appeal"})
-        assert response.status_code == 503
-        assert "index" in response.json()["detail"]
+def test_online_source_failure_is_clear_and_no_store(corpus):
+    def broken(_):
+        raise PolicySourceError("Cannot read GitHub policies. Check network access and retry.")
 
-
-@pytest.mark.parametrize(
-    "payload", [{"query": ""}, {"query": "  "}, {"query": "appeal", "limit": 100}, {}]
-)
-def test_invalid_search_request_rejected(tmp_path, payload):
-    with TestClient(create_app(Settings(data_dir=tmp_path))) as client:
-        assert client.post("/api/knowledge/search", json=payload).status_code == 422
-
-
-@pytest.mark.parametrize(
-    "query", ['" OR * NOT (', "你好", "the and or", "' ; DROP TABLE chunks;--"]
-)
-def test_query_syntax_cannot_break_index(corpus, query):
-    _, db, _ = corpus
-    search(db, query)
-    assert search(db, "appeals")
+    corpus.respond = broken
+    settings = Settings()
+    service = ChatService(
+        settings, lambda _: ScriptedModel(call("list_policy_documents")), corpus.factory
+    )
+    with TestClient(create_app(settings, service)) as client:
+        response = client.post("/api/chat", json={"content": "Can I appeal?"})
+    assert response.status_code == 503 and "GitHub" in response.json()["detail"]
+    assert response.headers["Cache-Control"] == "no-store"

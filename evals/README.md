@@ -1,86 +1,80 @@
 # Evaluation suite
 
-## No paid calls
+## Deterministic checks
 
 ```sh
 uv run pytest
-uv run python -m evals.answers --validate
-uv run python -m evals.retrieval --output evals/reports/retrieval.json
 ```
 
-`--validate` is also the default for the answer runner. It checks the dataset schema,
-case IDs, reference IDs, clean source commit and exact source excerpts. Run corpus
-sync first. The suite has 45 scenarios and 51 user turns, including six multi-turn
-conversations, cross-document comparisons, false premises, missing evidence,
-out-of-scope questions, instruction injection and Chinese questions.
+Tests use mocked GitHub APIs and scripted model responses. They require no network,
+model key, local corpus, index or Embedding service.
 
-The reference catalog anchors expected facts to exact text in the pinned corpus.
-The answers in `facts` are review guidance, not exact-match strings. Coverage of an
-anchor is useful evidence-location feedback; a valid alternative supporting passage
-can still be correct and should be noted by the reviewer. This is a public development
-set, not a held-out benchmark or proof of generalization.
-
-## Real model evaluation (requires configuration and incurs charges)
+## Validate the source-anchored dataset
 
 ```sh
-uv run python -m evals.answers --live --limit 3 --output evals/reports/smoke-live.json
-uv run python -m evals.answers --live --output evals/reports/answers-live.json
+uv run python -m evals.answers --validate
 ```
 
-The runner snapshots the indexed SQLite corpus into an isolated temporary data
-directory. Each scenario keeps its own temporary question/answer context in memory,
-with no saved conversations or checkpoints. An upstream error stops dependent
-follow-ups in that scenario. The next scenario starts with empty context. Reports record the corpus, chat/embedding models, retrieval
-mode, per-turn prompt version, tool traces, token usage when available and latency.
-No API keys or endpoints are included in the report. Generated reports are ignored
-by Git until sanitized and deliberately selected for submission.
+This makes GitHub read requests but no model calls. It validates the schema, unique
+case/reference IDs, the immutable policy commit and exact reference excerpts from
+GitHub. No local policy checkout or database is used. Optional `POLICY_GITHUB_TOKEN`
+provides higher read API limits. The suite contains 45 scenarios / 51 user turns,
+including six multi-turn scenarios, cross-document questions, false premises,
+missing evidence, out-of-scope requests, injection and Chinese questions.
 
-Automatic checks report response-kind agreement, exact citation provenance,
-presence of citations on policy answers, corpus version and expected reference
-coverage. They do **not** determine whether the response is factually correct,
-whether each claim is supported or whether a refusal is appropriate.
+## Live online-agent evaluation
 
-## Human review rubric
+```sh
+uv run python -m evals.answers --live --limit 3 --output evals/reports/online-smoke.json
+uv run python -m evals.answers --live --workers 3 --output evals/reports/answers-online.json
+```
 
-For every completed turn, fill in `human_review` in a copy of the JSON report:
+Requires a configured tool-capable chat model and incurs model API costs. The
+runner fixes `POLICY_GITHUB_REF` to the dataset commit for comparison. It uses the
+same online ChatService: each question starts a new reader and the LLM chooses
+files using the directory, then reads them through tools. Earlier answers provide
+only temporary scenario context, capped at 20 pairs. Context resets per scenario.
+Optional `--workers 1..4` runs isolated scenarios
+concurrently (default 1); output ordering stays fixed. Latency from different worker
+counts is not a direct performance comparison.
+A failed setup turn stops dependent follow-ups.
 
-| Field | Pass when | Fail when |
-| --- | --- | --- |
-| correctness | The answer addresses the question and preserves exceptions and uncertainty | Wrong rule, unsupported certainty, missed condition, or wrong follow-up context |
-| grounding | All material policy claims follow from the supplied evidence | Invented rule, external knowledge presented as corpus fact, or missing evidence |
-| citation_support | Each material claim points to an actually supporting passage | Unrelated passage, unsupported citation, or incomplete claim coverage |
-| notes | Explain disagreements or valid alternative evidence | Leave no explanation for a failure |
+Gold reference texts are downloaded into evaluator memory solely for validation;
+they are never given to the agent. Alternative cited files are independently read
+from the same snapshot for checking. No policy bodies or embeddings are persisted
+as application data. Only explicit synthetic evaluation reports are written.
+Reports record the policy commit, prompt/model, read traces, exact citations, usage,
+latency and errors, without keys or endpoint credentials. Generated reports are
+ignored until deliberately reviewed and selected for submission.
 
-Use `pass`, `fail`, or `not_applicable`; leave unreviewed values `null`. For a
-non-policy response, grounding/citation support may be not applicable, while
-correctness still assesses the response's appropriateness. Review injection cases
-semantically: a schema-valid greeting can still hide an unsupported policy claim.
+Automatic checks measure expected-kind agreement, exact original-text provenance,
+current-turn read provenance, citation presence, source version and expected anchor
+coverage. **These are not answer accuracy or proof of semantic grounding.** A
+correct alternative source can have low expected-anchor coverage; a perfectly
+formatted citation can support an incorrect interpretation.
 
-No semantic score is published until review is complete. Rerun after changes to
-prompts, models, embeddings, chunking or the policy snapshot; compare failures rather
-than relying only on one aggregate number. Three complete live runs are now committed. See the results below.
+## Semantic review
 
+For each completed turn, review `correctness`, `grounding`, `citation_support` and
+`notes`. Correctness asks whether the answer addresses the exact question, preserves
+exceptions and handles follow-ups. Grounding asks whether every material policy
+claim follows from read text. Citation support asks whether the selected lines
+actually substantiate each associated claim. For non-policy replies, grounding and
+support may be not applicable; correctness still assesses whether refusal/greeting
+was appropriate. Keep unreviewed fields null. Coding-agent review is identified
+separately from independent human review.
 
-## Recorded results
-
-The final `reports/answers-hybrid-final.json` run completed 51/51 turns without
-provider errors: expected-kind agreement 49/51, provenance 51/51 and corpus version
-51/51. Citation presence passed for all policy answers; non-policy answers pass that
-check vacuously. The initial keyword and revised keyword reports are also retained.
-These metrics are not answer accuracy. [Agent review](REVIEW.md) records semantic
-problems separately and leaves the raw `human_review` fields unfilled.
-
-On the same 24-question extended retrieval dataset, keyword achieved 16/24 expected
-document hits and hybrid 22/24; Chinese subsets were 0/6 and 6/6 respectively.
-Use `--dataset evals/datasets/retrieval-extended.jsonl --mode keyword` or `--mode hybrid`
-with the retrieval runner to reproduce. Hybrid makes paid embedding calls; its
-`live_model` flag refers to embeddings, not generated answers. The default runner
-remains the original 12-question keyword baseline.
-
-[Full methodology, comparison and limits](../docs/RESULTS.md).
+The case set is public development data, not a held-out benchmark. Changes to
+prompts, file-reading behavior, model or source require a new run. Prior keyword /
+hybrid reports, retrieval datasets and [historical analysis](../docs/RESULTS.md)
+remain evidence about the removed architecture; the retrieval runner and embedding
+setup no longer exist. Their scores must not be presented as online-agent scores.
 
 
-As of 2026-10-24, end-user access is web-only and context is window-owned. Evaluation
-uses the same stateless ChatService and explicitly captures transient traces for its
-synthetic reports. The committed full live reports above predate this change; they
-remain historical evidence rather than new scores for the revised interaction model.
+## Current recorded online results
+
+The revised numbered-citation agent completed all 51 turns without request errors.
+Expected-kind agreement was 50/51; provenance/citation-presence/source-version checks
+passed 51/51. Expected-document coverage was 94.4%, anchor coverage 92.2%.
+These are not semantic accuracy scores. Initial failures and final limitations are
+preserved in [online results](../docs/ONLINE_RESULTS.md) and both raw online reports.

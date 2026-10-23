@@ -1,12 +1,10 @@
 # Architecture and contracts
 
-## Current interaction model — 2026-10-24
+## Online file-reading interaction
 
-Web access only. The page owns completed turns in React memory; the server has no
-conversation store, session identifier, shared chat memory or persistent checkpointer.
-New tabs are empty. New chat, refresh, navigation away or window closure clears the
-page state. Page exit aborts the client request and invalidates late responses; the
-server may finish an already-running request, but never saves its dialogue.
+The page owns temporary completed turns. Each backend request creates a fresh
+LangGraph invocation and a GitHub reader; no local policy library, embeddings,
+conversation store or persistent graph checkpointer is involved.
 
 ```mermaid
 sequenceDiagram
@@ -19,120 +17,125 @@ sequenceDiagram
     box Agent execution
         participant A as LangGraph controller
         participant L as Configurable LLM
+        participant T as Policy reading tools
     end
-    box Policy retrieval
-        participant R as Retrieval tool
-        participant E as Configurable embeddings
-        participant K as Policy index
-    end
+    participant G as GitHub site-policy
     U->>W: Ask or follow up
-    W->>B: Question + temporary completed context
-    B->>A: Process this request
-    A->>L: Context and tool descriptions
-    L-->>A: Request policy search
-    A->>R: Execute search query
-    R->>E: Embed query text
-    E-->>R: Query vector
-    R->>K: Keyword and vector search
-    K-->>R: Policy candidates
-    R->>R: Fuse ranks and add neighboring clauses
-    R-->>A: Evidence and source IDs
-    A->>L: Supply retrieved evidence
-    L-->>A: Submit answer and citation IDs
-    A->>A: Validate IDs and build citation links
-    A-->>B: Final response
-    B-->>W: Answer and source excerpts
-    W->>W: Update temporary in-window context
-    W-->>U: Display answer
+    W->>B: Question and up to 20 completed pairs
+    B->>A: Start request-scoped agent
+    A->>L: Question, context and tool descriptions
+    L-->>A: Request policy directory
+    A->>T: list_policy_documents
+    T->>G: Resolve commit and read file tree
+    G-->>T: Commit, paths and sizes
+    T-->>A: Policy directory
+    A->>L: Supply directory
+    L-->>A: Choose policy file and line range
+    A->>T: read_policy_document
+    T->>G: Read blob from the pinned tree
+    G-->>T: Original file bytes
+    T-->>A: Numbered lines and source ID
+    A->>L: Supply original policy lines
+    opt More information needed
+        L-->>A: Choose another file or continuation
+        A->>T: read_policy_document
+        T->>G: Read selected file if not already in request memory
+        G-->>T: Original file bytes
+        T-->>A: Additional numbered lines
+        A->>L: Supply additional policy text
+    end
+    L-->>A: Submit answer and exact cited line ranges
+    A->>A: Check read ranges, extract originals and build links
+    A-->>B: Answer and source excerpts
+    B-->>W: Response
+    W-->>U: Display answer and citations
 ```
 
-The diagram describes the common hybrid path. Keyword mode omits query embeddings;
-the model can search again within its budget or request clarification. Document
-vectors are built ahead of time, not regenerated per question. Citation checking is
-code inside the agent's submit-answer handling, not a separate AI verifier.
+The LLM selects documents by path/name; no keyword/vector ranking or ingestion
+chunking occurs. The same read tool continues long files by line range. The
+controller repeats token budgeting before every LLM call, including after reads.
 
-## Evidence and retrieval
+## GitHub source and lifetime
 
-`corpus.lock.json` fixes the Git source commit. Parsing preserves title, heading,
-path, original line range, content hash and immutable GitHub URL. Chunk IDs include
-source identity. Index replacement is transactional; dirty or mismatched source is
-rejected. SQLite stores policy chunks, FTS5 and cached embeddings only.
+`PolicyRepository` talks only to the fixed public `github/site-policy` repository.
+The first directory request resolves `POLICY_GITHUB_REF` (default `HEAD`) to a
+commit, then lists its recursive tree. Only regular Markdown files under
+`Policies/` are exposed. Truncated/empty directories fail explicitly. Reads accept
+exact listed paths, not URLs, symlinks or traversal paths. The reader fetches the
+listed blob SHA and checks its Git blob hash before returning original lines.
 
-Hybrid retrieval fuses up to 20 keyword and 20 semantic candidates using
-`1/(60+rank)`, normally returning six seeds. The agent's search tool adds up to four
-neighboring chunks from the top three seeds; at most ten pieces of evidence per
-search. The public search API and retrieval benchmark do not add neighbors.
+These operations use GitHub's official [commit](https://docs.github.com/en/rest/commits/commits#get-a-commit),
+[tree](https://docs.github.com/en/rest/git/trees#get-a-tree) and
+[blob](https://docs.github.com/en/rest/git/blobs#get-a-blob) read APIs.
+No API request is made on page startup, imports or health checks. A greeting can
+finish without touching GitHub. An optional independent read-only GitHub token
+increases REST API limits; no model or GitHub credential enters prompts/responses.
 
-Embedding identity includes provider, model, endpoint, input hash and dimensions.
-Incompatible indexes fail explicitly. Compatible adapters send raw text and request
-float vectors. Chat and embedding services are independently configurable.
+Commit, directory and file bodies are cached only in this request's reader. Closing
+the reader clears cached source text. Each subsequent question resolves a fresh
+snapshot even when history was supplied. A full configured commit SHA provides
+repeatability; moving refs may yield different snapshots on subsequent questions.
+Original policy bytes, indexes, embeddings and chat records are never saved by the
+application. Unused old local files are not consulted.
 
-## Request-scoped agent
+## Bounded tools and source citations
 
-`ChatService.chat(question, history)` creates a fresh graph invocation. History is
-caller-owned, limited to completed question/answer pairs, at most 20 pairs. All
-supplied pairs are used when they fit. It is never used as policy evidence. No model
-initialization or paid request occurs at import, health checks or corpus indexing.
+- `list_policy_documents()` returns paths/sizes and the immutable commit.
+- `read_policy_document(path, start_line=1, line_count=200)` returns numbered
+  original lines, a source ID, total lines and `next_start_line` for continuation.
+- `submit_answer(kind, answer, citations)` supplies inline `[[1]]`, `[[2]]` markers
+  and selected line ranges. The server assigns display labels and extracts text.
 
-Before every model call, `ContextBudget` estimates input tokens for system text,
-tool definitions, history, the current question and all current-turn messages. It
-subtracts the configured output cap and safety margin from the model's context
-capacity. It drops oldest **whole question/answer pairs** until the input fits.
-The next call after retrieval repeats this check; AI tool calls and their matching
-results remain together, with the current question and agent execution intact.
-History from an earlier request's agent execution is never imported.
+Defaults: six read attempts, two directory requests, ten successful model responses,
+up to four tool calls per response. Read bodies are at most 200 lines / 24,000
+characters, files at most 512 KB. HTTP responses and directory size are bounded.
+Model-owned invalid tool requests receive safe correction messages; upstream errors
+abort the request with a sanitized source error, not a policy answer from memory.
 
-Capacity comes from `POLICY_CHAT_CONTEXT_WINDOW_TOKENS`, or (when zero) LangChain's
-model profile, with a documented 32,768-token fallback for unknown models. Output
-defaults to 2,048 tokens (also passed to the model as `max_tokens`); the default
-margin is 512. Token counting is a local LangChain approximation with a UTF-8
-allowance, not an exact vendor tokenizer. Recognized provider context errors drop
-one more oldest pair and retry until accepted or no history remains. No network,
-authentication or rate-limit errors trigger this retry. If mandatory current-turn
-material cannot fit without history, return 422 instead of breaking tool messages
-or fabricating a policy refusal. No automatic summaries are created.
+Each numbered citation entry must bind to a source ID read in the current
+request. Multiple entries may select distinct passages from the same source ID.
+Markers index that citation list and must match its entries; selected ranges must
+lie within the returned read window and
+span 1–80 lines. Excerpts are exact originals, with immutable commit/line URLs.
+Prior answers are context only and cannot authorize a citation. Answered policy
+claims require at least one current-turn read and citation. This validates
+provenance, not semantic support. Conservative localized insufficient-evidence
+text prevents unsupported claims being smuggled into a refusal.
 
-The model calls `search_policies` and `submit_answer`; defaults are three searches
-and six successful model responses per turn. Overflow retries are additionally
-bounded by the at-most-20 historical pairs and appear in explicit evaluation traces.
-State includes messages, remaining history count, evidence, counts and an
-in-memory trace. Errors do not leave a partial turn behind. Separate requests do
-not share messages, evidence or budgets; conversation locks are no longer needed.
+## Temporary context
 
-Answered policy claims require current-turn retrieved IDs. The server rejects
-unknown IDs, malformed markers and handwritten links, then creates numbered links
-and exact excerpts. This checks provenance, not semantic support. For
-`insufficient_evidence`, conservative localized text replaces model prose. Semantic
-classification and unsupported generalizations remain known model-quality risks.
+The frontend sends at most 20 completed question/answer pairs. The server uses all
+when they fit; there is no fixed six-turn selection. Each model call counts system
+text, tools, history, current question and current-turn messages, reserving output
+and a safety margin. Oldest **whole historical pairs** are removed until estimated
+input fits. Current-turn tool calls and results remain together. Recognized provider
+context errors remove one more oldest pair and retry, bounded by remaining history.
+If mandatory material cannot fit with no history, return 422.
 
-## API
+The model context window is configurable; zero uses a LangChain profile or a
+32,768-token fallback for unknown models. Output defaults to 2,048 tokens and is
+also passed to the model; margin defaults to 512. Local estimates include a
+non-ASCII allowance but are not exact vendor tokenization. Overflow retries can
+handle underestimates; conservative estimates may trim earlier than necessary.
+Authentication, rate-limit and transport errors do not trigger history trimming.
 
-| Method | Path | Contract |
-| --- | --- | --- |
-| GET | `/api/health` | Process/configuration status; `conversation_mode=window-memory` |
-| GET | `/api/knowledge` | Source commit, document/chunk counts |
-| POST | `/api/knowledge/search` | `{query, limit}` to inspect ranked evidence |
-| POST | `/api/chat` | `{content, history:[{question,answer}]}` to process one turn |
+State is isolated per request, including evidence, budgets and optional traces.
+Response metadata reports history received/used/trimmed counts. Backend trimming
+does not alter the displayed frontend turns. There are no IDs for saved
+conversations, cookies, local/session storage writes or cross-request agent traces.
 
-All former `/api/conversations` create/list/get/delete/message routes are removed.
-History fields are bounded (question 1–4,000 chars, answer 1–6,000 chars); role/tool
-fields cannot be injected through the context schema. Empty requests or overlong
-context return 422. Chat responses, including errors, use `Cache-Control: no-store`.
-No cookies or browser local/session storage are used. The frontend blocks duplicate
-submissions and clearing while a request is pending; it aborts and ignores responses
-on page exit. Network retries cannot append to a hidden server-side conversation.
+## API and evaluation
 
-## Diagnostics, evaluation and scope
+`GET /api/health` reports backend configuration. `GET /api/policies` reports the
+fixed repository and selected ref, without listing/fetching files. `POST /api/chat`
+accepts `{content, history:[{question,answer}]}`. History fields are bounded and
+cannot inject role/tool fields. Chat responses, including errors, use no-store.
+The former knowledge-search, conversation CRUD and CLI/setup flows are removed.
 
-Responses include model/prompt/corpus metadata, request run ID, counts and latency,
-plus received/used/trimmed history counts. Trimming changes only LLM input, not
-frontend display state; each new request starts from that request's supplied pairs.
-Run IDs are diagnostic labels, not database keys. No ordinary chat/run/checkpoint
-record is written. Explicit evaluations request a transient trace and write their
-synthetic cases to reports; context resets between scenarios. Corpus copies keep
-evaluation evidence stable.
-
-Policy initialization uses `python -m policy_agent.setup {sync,index,embed,status}`.
-There is no CLI chat or resumable terminal conversation. No authentication, admin
-console or automatic summarization is included. Historical live reports and demo
-captures predate this revised window-only interaction model.
+Explicit evaluations hold expected original documents in evaluator memory and
+write synthetic reports deliberately. The agent receives neither gold reference
+text nor expected paths, and still selects/reads files online in each turn. Source
+verification checks original lines and actual-read traces independently, including
+alternative cited files outside the gold reference set. Evaluation reports distinguish
+structural provenance/coverage from semantic correctness. Historical mixed-retrieval
+reports are preserved, with their original failures.

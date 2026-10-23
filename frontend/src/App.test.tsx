@@ -14,20 +14,20 @@ import { api, ApiError, type Answer } from "./api";
 
 vi.mock("./api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./api")>()),
-  api: { health: vi.fn(), knowledge: vi.fn(), send: vi.fn() },
+  api: { health: vi.fn(), policies: vi.fn(), send: vi.fn() },
 }));
 
 const answer: Answer = {
   kind: "answered",
   answer: "You can submit an appeal. [1]",
   run_id: "run-1",
-  corpus_commit: "abcdef123456",
-  search_calls: 1,
+  source_commit: "abcdef123456",
+  read_calls: 1,
   latency_ms: 320,
   citations: [
     {
       label: 1,
-      chunk_id: "evidence",
+      source_id: "evidence",
       title: "Appeal and Reinstatement",
       heading: "How this works",
       content: "Please fill out the appeal form. <script>unsafe()</script>",
@@ -46,12 +46,12 @@ beforeEach(() => {
   vi.mocked(api.health).mockResolvedValue({
     status: "ok",
     chat_configured: true,
-    retrieval_mode: "keyword",
+    source_mode: "github-online",
   });
-  vi.mocked(api.knowledge).mockResolvedValue({
-    commit: "abcdef123456",
-    documents: 57,
-    chunks: 721,
+  vi.mocked(api.policies).mockResolvedValue({
+    repository: "https://github.com/github/site-policy",
+    ref: "HEAD",
+    source_mode: "github-online",
   });
   vi.mocked(api.send).mockResolvedValue(answer);
 });
@@ -76,9 +76,50 @@ async function ask(question: string, container: HTMLElement = document.body) {
 }
 
 describe("temporary Policy Desk", () => {
-  it("shows the library and suggestion without any history controls", async () => {
+  it("opens independently numbered passages from the same source read", async () => {
+    vi.mocked(api.send).mockResolvedValue({
+      ...answer,
+      answer: "Use the form. [1] Six months. [2]",
+      citations: [
+        answer.citations[0],
+        {
+          ...answer.citations[0],
+          label: 2,
+          start_line: 29,
+          end_line: 29,
+          content: "Appeal within six months.",
+        },
+      ],
+    });
     await ready();
-    expect(screen.getByText("57 documents")).toBeInTheDocument();
+    await ask("What is the deadline?");
+    await screen.findByRole("button", { name: "View source 2" });
+    await userEvent.click(
+      screen.getByRole("button", { name: "View source 2" }),
+    );
+    expect(screen.getByText("Appeal within six months.")).toBeInTheDocument();
+    expect(screen.getByText("Lines 29–29")).toBeInTheDocument();
+  });
+  it("renders a greeting without a policy snapshot or file read", async () => {
+    vi.mocked(api.send).mockResolvedValue({
+      ...answer,
+      kind: "greeting",
+      answer: "Hello!",
+      citations: [],
+      source_commit: null,
+      read_calls: 0,
+    });
+    await ready();
+    await ask("Hello");
+    expect(await screen.findByText("Hello!")).toBeInTheDocument();
+    expect(screen.getByText(/0 file reads/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "View source 1" }),
+    ).not.toBeInTheDocument();
+  });
+  it("shows the online source and suggestion without any history controls", async () => {
+    await ready();
+    expect(screen.getByText("Read from GitHub")).toBeInTheDocument();
     expect(screen.getByText("This window only")).toBeInTheDocument();
     expect(
       screen.queryByRole("navigation", { name: "Conversation history" }),
@@ -255,7 +296,7 @@ describe("temporary Policy Desk", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Cannot reach the server",
     );
-    expect(screen.queryByText("57 documents")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not indexed")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Send question" }),
     ).toBeDisabled();

@@ -1,3 +1,6 @@
+Historical keyword/hybrid review; the architecture below was removed on 2026-10-24.
+Current online-agent observations are in [ONLINE_RESULTS](../docs/ONLINE_RESULTS.md).
+
 # Agent semantic review of final hybrid run
 
 Report: `reports/answers-hybrid-final.json`; prompt `policy-agent-v2`.

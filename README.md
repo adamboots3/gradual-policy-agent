@@ -1,72 +1,51 @@
 # GitHub Policy Support Agent
 
-A web-based policy support assistant built with LangChain, LangGraph, FastAPI and
-React/TypeScript, grounded in a pinned snapshot of [GitHub policies](https://github.com/github/site-policy).
+A web assistant built with LangChain, LangGraph, FastAPI and React/TypeScript.
+It browses [github/site-policy](https://github.com/github/site-policy) online:
+list policy files, let the LLM choose files, read their original lines, then answer
+with verified source excerpts. No local policy database, keyword/vector index,
+embedding service, document ingestion or prebuilt chunks are required.
 
 Repository: [adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent)
-(private; reviewers need access). See [results](docs/RESULTS.md) for real evaluation
-reports and known answer-quality limitations.
+(private; reviewers need access). [Architecture](docs/ARCHITECTURE.md),
+[verification](docs/VERIFICATION.md), [current results](docs/ONLINE_RESULTS.md),
+[evaluation](evals/README.md).
 
-## Temporary conversations, web access only
+## Run locally
 
-Chat context lives only in the current page's memory. Follow-ups in that window
-carry completed question/answer pairs to the server. New tabs/windows start empty.
-Closing, navigating away, refreshing, or choosing **New conversation** discards the
-current chat. There is no history list, resume endpoint, browser storage, server
-conversation database, or persistent graph checkpointer. Failed questions remain
-editable in the current window and are excluded from follow-up context.
-
-The only end-user interface is the web client. The former CLI chat and its console
-entry point were removed. The initialization module below only prepares/inspects the
-policy library; it is not a conversation interface. Policy documents, indexes and
-embedding vectors remain on disk. The application does not save ordinary chat text
-or tool traces. Explicit evaluation commands still write synthetic test reports.
-
-## Native setup
-
-Requirements: Python 3.12, Git, [uv](https://docs.astral.sh/uv/getting-started/installation/),
-and Node.js 24. Run backend commands from the repository root.
+Requirements: Python 3.12, [uv](https://docs.astral.sh/uv/getting-started/installation/),
+Node.js 24, and network access to GitHub and your chosen model API.
 
 ```sh
 git clone https://github.com/adamboots3/gradual-policy-agent.git
 cd gradual-policy-agent
 uv sync --locked --all-extras
-uv run python -m policy_agent.setup sync
-uv run python -m policy_agent.setup index
-uv run python -m policy_agent.setup status
 ```
 
-Copy `.env.example` to `.env` using your OS file-copy command. Choose a chat model
-with tool calling; configure provider, model, endpoint and key independently of
-embeddings. Missing configuration is shown explicitly, not replaced by fake answers.
+Copy `.env.example` to `.env`. Select a model with tool calling. For a compatible
+endpoint, use LangChain's `openai` adapter with your own model and base URL:
 
 ```dotenv
 POLICY_CHAT_PROVIDER=openai
 POLICY_CHAT_MODEL=YOUR_TOOL_CAPABLE_MODEL
 POLICY_CHAT_BASE_URL=YOUR_COMPATIBLE_API_BASE_URL
 POLICY_CHAT_API_KEY=YOUR_CHAT_KEY
-POLICY_RETRIEVAL_MODE=keyword
+POLICY_CHAT_CONTEXT_WINDOW_TOKENS=YOUR_MODEL_CONTEXT_CAPACITY
 ```
 
-Here `openai` selects LangChain's compatible client, not a fixed model vendor.
-Anthropic chat uses `anthropic`; other integrations require their own locked adapter.
-The optional `POLICY_CHAT_EXTRA_BODY` passes provider-specific options. Model keys
-stay on the backend and must never be committed.
+`openai` selects an adapter, not a fixed model vendor. The `anthropic` adapter is
+also locked; additional providers need their own integration. The optional
+`POLICY_CHAT_EXTRA_BODY` accepts provider-specific JSON. Only the backend reads
+credentials. No Embedding API key or policy initialization command is needed.
+Model generation may incur your provider's charges.
 
-For hybrid retrieval, configure independent `POLICY_EMBEDDING_PROVIDER`,
-`POLICY_EMBEDDING_MODEL`, `POLICY_EMBEDDING_BASE_URL`, `POLICY_EMBEDDING_API_KEY` and
-`POLICY_EMBEDDING_BATCH_SIZE`. Then run:
-
-```sh
-uv run python -m policy_agent.setup embed
-```
-
-This sends policy text to the selected embedding service and may incur charges.
-After a successful build, set `POLICY_RETRIEVAL_MODE=hybrid`. Changing embedding
-provider, endpoint or model requires a rebuild; re-indexing invalidates vectors.
-Hybrid setup errors fail explicitly instead of silently falling back to keywords.
-
-Start the backend:
+`POLICY_GITHUB_REF=HEAD` follows the policy repository's default branch. Every
+question resolves it once, then reads and cites one immutable commit. Set a full
+commit SHA to use a specific version. GitHub access to this public repository works
+without a token; optionally set `POLICY_GITHUB_TOKEN` for higher REST API limits.
+Use a token with read access only. Model keys and GitHub tokens are independent.
+GitHub rate limits or network failures produce an explicit error rather than a
+policy answer reconstructed from model memory.
 
 ```sh
 uv run uvicorn policy_agent.api:app --host 127.0.0.1 --port 8000
@@ -80,102 +59,108 @@ npm ci --no-audit --no-fund
 npm run dev
 ```
 
-Open [the web client](http://localhost:5173). Vite proxies `/api` to port 8000.
-For an alternate development backend, set `POLICY_API_PROXY_TARGET` before starting
-Vite; it is a server-side proxy setting, not a browser credential. Restart existing
-backend/frontend processes after updating from the former persistent-history version.
+Open [the web client](http://localhost:5173); [API explorer](http://localhost:8000/docs).
+Vite proxies `/api` to port 8000. To change the development backend, set
+`POLICY_API_PROXY_TARGET` before starting Vite. Restart existing processes after
+updating the source. The web client is the only conversation interface.
 
-The corpus is fixed by `corpus.lock.json` (57 documents / 721 chunks). Sync rejects
-a dirty or mismatched checkout. Source citations use immutable commit URLs and exact
-line ranges; the pinned source can differ from GitHub's currently published policy.
+## Agent and citations
 
-## API and context contract
+The model has three tools:
 
-[API explorer](http://localhost:8000/docs). `GET /api/health` and `/api/knowledge`
-report configuration/corpus status. `POST /api/knowledge/search` searches policy
-text. `POST /api/chat` handles a request with optional window-owned context:
+| Tool | Purpose |
+| --- | --- |
+| `list_policy_documents()` | Get policy file paths and sizes, fixing this turn's commit |
+| `read_policy_document(path, start_line, line_count)` | Open a selected file and return numbered original lines |
+| `submit_answer(kind, answer, citations)` | Submit an answer with exact original-line references |
+
+The LLM chooses files by directory and filename; it can open more files or continue
+a long document. There is no algorithmic relevance ranking or automatic chunk
+selection. Defaults allow six read attempts, two directory requests and ten
+successful model responses per question, with at most four tools per response.
+Each read returns at most 200 lines and 24,000 characters, plus continuation metadata.
+The server checks Git blob identity; repeated reads within one question reuse an
+in-memory file. No policy contents or conversation state are written to disk.
+
+For policy answers the model supplies `[[1]]`, `[[2]]` markers and cited line ranges.
+Each numbered list entry binds a source ID to an exact range; different passages
+from the same read can have separate citation numbers.
+The server checks that each reference selects 1–80 lines actually read in this
+question, extracts the original text and creates an immutable GitHub URL. This
+checks provenance, **not whether every claim is semantically supported**. File
+selection, missed conditions and unsupported interpretations remain model risks.
+
+## Temporary context and API
+
+Completed turns live only in the current page's React memory. Refresh, navigation,
+closure or New conversation discards them. There is no saved-history UI, browser
+storage, server conversation database or persistent graph checkpointer.
 
 ```json
 {
   "content": "Where should I submit it?",
-  "history": [{"question": "Can I appeal a suspension?", "answer": "Previous completed response"}]
+  "history": [{"question": "Can I appeal a suspension?", "answer": "Previous response"}]
 }
 ```
 
-No conversation ID or cookie is required. The frontend sends its most recent 20
-completed question/answer pairs; all supplied pairs enter model context when they
-fit. Before **every** model call (including after retrieval), the backend budgets
-system text, tool schemas, history, the current question and current-turn tool
-messages, plus reserved output and a safety margin. It removes oldest complete
-pairs until the estimated input fits; it never summarizes history or splits a
-current-turn tool call/result pair. A recognized provider context-overflow error
-triggers further oldest-pair removal and retry, bounded by the remaining history.
+`POST /api/chat` accepts at most 20 completed question/answer pairs, each bounded
+at 4,000/6,000 characters. It uses all supplied pairs when they fit. Before every
+model call, including after online reads, it budgets system text, tool schemas,
+history, current question and current-turn messages. It reserves output capacity
+and removes the oldest **complete historical pair** until estimated input fits.
+The current question and current-turn tool call/result pairs remain intact.
+Recognized provider context errors trigger further bounded trimming and retry.
+No summaries or previous-turn agent/tool execution are imported.
 
-Set `POLICY_CHAT_CONTEXT_WINDOW_TOKENS` to your model's total context capacity,
-especially for compatible endpoints/custom model names. The default `0` uses the
-LangChain model profile when available, otherwise a **32,768-token fallback**, not
-automatic discovery of a custom endpoint's capacity. Output is capped by
-`POLICY_CHAT_MAX_OUTPUT_TOKENS` (default 2,048), with
-`POLICY_CHAT_CONTEXT_MARGIN_TOKENS` (default 512) reserved as additional headroom.
-Counting uses a conservative local approximation with a non-ASCII allowance;
-different tokenizers may cause earlier trimming or a provider overflow retry.
-The obsolete `POLICY_HISTORY_TURNS` setting has no effect.
+`POLICY_CHAT_CONTEXT_WINDOW_TOKENS=0` uses the LangChain profile when available,
+otherwise a documented 32,768-token fallback. Custom endpoints should set their
+actual capacity explicitly. Output is capped at `POLICY_CHAT_MAX_OUTPUT_TOKENS`
+(default 2,048), with `POLICY_CHAT_CONTEXT_MARGIN_TOKENS` (default 512) reserved.
+Token counts are conservative local estimates, not an exact vendor tokenizer.
+If mandatory current-turn material alone cannot fit, the API returns a clear 422.
+Trimming affects LLM input, not the page's displayed history. Old
+`POLICY_HISTORY_TURNS`, retrieval and embedding settings have no effect.
 
-Context is untrusted and is used to interpret follow-ups; policy claims still need
-current-turn retrieval. The response includes answer, citations and diagnostic
-metadata, including `context.history_turns_received/used/trimmed`, without saved
-run records or ordinary tool traces. Trimming affects this request's LLM input;
-the displayed page history remains intact. Chat responses use
-`Cache-Control: no-store`. If current-turn material cannot fit even after all
-history is removed, the API returns a clear 422. Configuration failures return 503;
-other provider errors return a sanitized 502. The application has no authentication. Stop chat requests before
-replacing the corpus.
+| Endpoint | Contract |
+| --- | --- |
+| `GET /api/health` | Backend/model configuration status, without external calls |
+| `GET /api/policies` | Repository/ref configuration, without spending GitHub API quota |
+| `POST /api/chat` | One question plus temporary history; returns answer and source excerpts |
 
-## Verify
+Responses include `source_commit`, `read_calls`, model/prompt metadata, latency and
+received/used/trimmed history counts. Greetings can have a null source commit when
+no policy was read. Chat responses use `Cache-Control: no-store`. Source/configuration
+failures return 503, context/schema failures 422, other provider failures a sanitized
+502. Former `/api/knowledge` and `/api/conversations` routes are removed. No
+authentication or public application deployment is included.
+
+## Verify and evaluate
 
 ```sh
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest
 uv run python -m evals.answers --validate
-uv run python -m evals.retrieval --mode keyword
 ```
 
-From `frontend/`: `npm test`, `npm run format:check`, `npm run build`. Deterministic
-tests need no model keys. Source-based eval validation requires sync/index first.
-Tests cover temporary context, isolation, failure handling, no conversation files,
-retrieval and citation validation. Scripts invoke Node directly so Windows paths
-containing spaces or `&` work.
+Tests use scripted models and mocked GitHub responses; they need no model keys or
+network. Dataset validation reads the pinned reference files online but makes no
+model calls. From `frontend/`: `npm test`, `npm run format:check`, `npm run build`.
+The [evaluation suite](evals/README.md) covers 45 scenarios / 51 turns with exact
+source anchors. Live evaluation uses the same online agent and incurs model costs.
+The [final online run](docs/ONLINE_RESULTS.md) completed 51/51 turns with no request
+errors, 50/51 expected-kind agreement and 51/51 provenance checks. These are not
+semantic accuracy scores; file-selection and interpretation failures remain.
+Previous hybrid/keyword reports are historical, not scores for this architecture.
 
-For paid answer evaluation: `uv run python -m evals.answers --live`. Each scenario
-keeps context in process memory only and resets it for the next case. Reports and
-rubric: [eval suite](evals/README.md). Existing 2026-10-22 reports were run before the
-window-memory change; they are historical quality evidence, not reruns of this revision.
-Citation provenance checks do not prove that every claim is supported.
-
-## Docker
+## Containers
 
 ```sh
-docker compose up --build
-docker compose run --rm backend uv run --no-sync python -m policy_agent.setup sync
-docker compose run --rm backend uv run --no-sync python -m policy_agent.setup index
-# If hybrid retrieval is configured:
-docker compose run --rm backend uv run --no-sync python -m policy_agent.setup embed
+docker compose up --build -d --wait
 ```
 
-Web: [localhost:8080](http://localhost:8080); API: port 8000. The named volume stores
-only the policy library/index; conversations are not written there. Compose reads
-`.env` at runtime (Compose 2.24+); keys are not embedded in images. Previous CI
-passed Windows/Linux checks and Docker build/start/health for revision `b8af71c`;
-current revision verification is recorded separately in [verification](docs/VERIFICATION.md).
-
-## Documentation
-
-- [Architecture and numbered sequence](docs/ARCHITECTURE.md)
-- [Current scope and plan](docs/PLAN.md)
-- [UI behavior](docs/UI.md)
-- [Acceptance checklist](docs/ACCEPTANCE.md)
-- [Historical live demo](docs/DEMO.md), [results](docs/RESULTS.md), [semantic review](evals/REVIEW.md)
-
-Never commit `.env`, provider keys or private data. The specific providers used in
-historical evaluations are recorded for reproducibility, not required defaults.
+Open [the containerized web client](http://localhost:8080). Compose reads `.env`
+when present; missing model configuration is shown by the UI. No data volume,
+Git clone, index construction or embedding step is needed. Health checks require
+neither model keys nor GitHub access. Windows/Linux backend and frontend CI plus
+Docker build/start/health checks are defined in `.github/workflows/ci.yml`.

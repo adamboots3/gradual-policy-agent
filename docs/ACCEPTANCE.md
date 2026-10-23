@@ -1,40 +1,22 @@
-# Acceptance audit — updated 2026-10-24 (Asia/Shanghai)
+# Acceptance audit — online-reading revision, 2026-10-24
 
-Core assignment features, local verification and private GitHub delivery are complete.
-All five GitHub Actions jobs passed for baseline source revision `b8af71c`; the
-window-memory/web-only revision has separate local checks recorded in VERIFICATION.md. Known model-quality
-limitations and independent semantic review remain documented.
+Current design follows the user's revised scope: web-only temporary conversations
+and an agent that chooses and reads policy files directly from GitHub. The local
+policy library, embeddings, ingestion/indexing and interactive CLI are removed.
 
-| Requirement | Implementation and executed evidence | Remaining limitation |
+| Requirement | Current implementation | Boundary |
 | --- | --- | --- |
-| Policy-grounded support | Pinned 57-document corpus; hybrid retrieval; 51 real answer turns | Semantic review found overstatements; see `evals/REVIEW.md` |
-| Multi-turn | Window-owned temporary context; fresh per-request graph; no persistent history | One trademark follow-up unnecessarily refused |
-| Source citations | Exact immutable GitHub lines, excerpts, IDs checked; all 51 turns passed provenance validation | Valid provenance does not prove claim support |
-| Web interface | Web chat only; CLI chat removed by revised user scope; window isolation/reset tests | 1280×720 temporary-chat flow and reset verified; latest narrow-screen behavior covered by responsive CSS/component checks |
-| Evaluation suite | 45 scenarios, 51 turns, 36 anchors; three complete real runs and retrieval comparison | Public development set; independent human review not completed |
-| Agent framework | LangChain provider/tools + bounded LangGraph state machine | One process/worker; no production authentication |
-| Reproducible environment | Python/npm locks; new clean environment without SQLite checkpointer; 63 backend tests and 11 frontend tests passed | Windows/Linux CI and Docker build/start/health passed; containerized corpus/model execution untested |
-| GitHub submission | Private `adamboots3/gradual-policy-agent`, `main`, source revision `b8af71c` uploaded | Reviewers need private-repository access |
+| Policy-grounded support | List directory, let the LLM choose/read files, answer from current-turn text | File-selection misses and semantic overstatements remain possible |
+| Multi-turn | At most 20 frontend-owned completed pairs; oldest-first context trimming | No summaries or history restoration |
+| Source citations | Actual-read IDs, exact selected original lines, immutable commit URLs | Provenance does not prove claim support |
+| Agent framework | LangChain tools/model adapters and bounded LangGraph execution | No arbitrary browsing or production authentication |
+| Web access | React chat, inline citations, source panel and online-source information | Model/GitHub access is required for policy answers |
+| Environment | Locked Python/npm dependencies, native and Compose startup, no policy initialization | Latest executed checks are in VERIFICATION.md; historical remote CI is not a new run |
+| Evaluation | Two complete online runs; final 51/51 completed, 50/51 expected kinds, 51/51 provenance | File-selection/semantic issues are documented; independent human review remains open |
+| GitHub delivery | Existing private repository; current online revision prepared locally | Requires a subsequent push and reviewers' repository access |
 
-## Delivery evidence
-
-Repository: [adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent),
-private, default branch `main`. Created using the user's existing account, matching
-visibility of the other assignment repository. Source revision: `b8af71c`.
-
-[GitHub Actions run](https://github.com/adamboots3/gradual-policy-agent/actions/runs/39810856851): all five jobs passed:
-Windows/Linux backend, Windows/Linux frontend and Docker build/start/health smoke.
-Containerized corpus sync/index and paid model execution were not part of the smoke
-check; those paths were exercised natively on Windows. Docker is absent locally.
-
-## Final reviewer handoff
-
-- Include the repository URL and grant the intended reviewers access to the private
-  repository. Do not make it public or invite arbitrary accounts automatically.
-- Review the live report and known issues. Human review fields are blank deliberately;
-  the coding agent's qualitative review is labeled separately.
-- Reviewers supply their own model keys; credentials and local databases are ignored.
-  No API keys were uploaded and no GitHub Actions secrets were needed.
-
-No public application deployment has been created. The repository contains native
-and Compose startup instructions, actual demonstration screenshots and evaluation reports.
+Repository: [adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent).
+The previous web-only commit `4bc4639` passed all five GitHub Actions jobs.
+The online-reading change is recorded separately; old reports remain historical.
+No public deployment or automatic reviewer invitations were created. Credentials
+stay local and are never included in submitted reports.

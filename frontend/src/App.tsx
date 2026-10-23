@@ -22,7 +22,7 @@ import {
   type Answer,
   type Citation,
   type Health,
-  type Knowledge,
+  type PolicySource,
   type Turn,
 } from "./api";
 
@@ -156,7 +156,7 @@ function Sources({
 export default function App() {
   const questionId = useId();
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [knowledge, setKnowledge] = useState<Knowledge | null>(null);
+  const [policySource, setPolicySource] = useState<PolicySource | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState("");
@@ -175,11 +175,11 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     setBooting(true);
-    Promise.all([api.health(), api.knowledge()])
+    Promise.all([api.health(), api.policies()])
       .then(([h, k]) => {
         if (!cancelled) {
           setHealth(h);
-          setKnowledge(k);
+          setPolicySource(k);
           setBootError("");
         }
       })
@@ -269,11 +269,9 @@ export default function App() {
   const setupIssue =
     !booting &&
     !bootError &&
-    (knowledge?.chunks === 0
-      ? "The policy library is empty. Run the corpus setup in README, then refresh."
-      : health && !health.chat_configured
-        ? "Chat is not configured yet. Complete the model setup in README, restart the backend, then refresh."
-        : "");
+    (health && !health.chat_configured
+      ? "Chat is not configured yet. Complete the model setup in README, restart the backend, then refresh."
+      : "");
 
   return (
     <div className="app-shell">
@@ -311,17 +309,15 @@ export default function App() {
         </div>
         <div className="library-card">
           <div className="library-label">
-            <span
-              className={`status-dot ${knowledge?.chunks ? "" : "muted"}`}
-            />{" "}
-            Policy library
+            <span className={`status-dot ${policySource ? "" : "muted"}`} />{" "}
+            Policy source
           </div>
-          <strong>{knowledge?.documents ?? "—"} documents</strong>
-          <p>GitHub’s published site policies</p>
+          <strong>Read from GitHub</strong>
+          <p>Open policy files when needed</p>
           <div className="snapshot">
             <GitBranch size={13} />
-            {knowledge?.commit?.slice(0, 8) || "Not indexed"}
-            <span>SNAPSHOT</span>
+            {policySource?.ref || "Connecting"}
+            <span>PER QUESTION</span>
           </div>
         </div>
         <a
@@ -444,7 +440,7 @@ export default function App() {
                     {turn.response.citations.length > 0 && (
                       <div className="citation-list">
                         {turn.response.citations.map((c) => (
-                          <button key={c.chunk_id} onClick={() => setSource(c)}>
+                          <button key={c.label} onClick={() => setSource(c)}>
                             <span>{c.label}</span>
                             {c.title}
                             <ArrowUpRight size={12} />
@@ -453,12 +449,18 @@ export default function App() {
                       </div>
                     )}
                     <div className="answer-meta">
-                      {turn.response.search_calls}{" "}
-                      {turn.response.search_calls === 1 ? "search" : "searches"}
+                      {turn.response.read_calls}{" "}
+                      {turn.response.read_calls === 1
+                        ? "file read"
+                        : "file reads"}
                       <span>·</span>
                       {(turn.response.latency_ms / 1000).toFixed(1)}s
-                      <span>·</span>Snapshot{" "}
-                      {turn.response.corpus_commit.slice(0, 8)}
+                      {turn.response.source_commit && (
+                        <>
+                          <span>·</span>Snapshot{" "}
+                          {turn.response.source_commit.slice(0, 8)}
+                        </>
+                      )}
                     </div>
                   </article>
                 </div>
@@ -524,7 +526,7 @@ export default function App() {
               />
               <div className="composer-bottom">
                 <span>
-                  <BookOpen size={13} /> GitHub policy library
+                  <BookOpen size={13} /> GitHub policy repository
                 </span>
                 <span className="composer-shortcut">
                   {draft.length > 3500

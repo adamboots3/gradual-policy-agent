@@ -18,3 +18,6 @@ evals/reports/*.json
 !evals/reports/answers-keyword-v2.json
 !evals/reports/answers-hybrid-final.json
 *.egg-info/
+
+!evals/reports/answers-online-initial.json
+!evals/reports/answers-online.json

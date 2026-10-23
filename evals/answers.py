@@ -1,22 +1,20 @@
 """Source-anchored cases; structural metrics and human quality review stay separate."""
 
 import argparse
+import hashlib
 import json
 import re
-import sqlite3
-import tempfile
-from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
+from urllib.parse import quote
 
 import yaml
 from policy_agent.chat import ChatService, HistoryTurn
 from policy_agent.config import Settings
-from policy_agent.ingestion import git
+from policy_agent.github_source import REPOSITORY_URL, PolicyRepository
 from policy_agent.providers import create_chat
-from policy_agent.retrieval import corpus_status
-from policy_agent.storage import connect
 from pydantic import BaseModel, Field, model_validator
 
 KINDS = Literal["answered", "clarification", "out_of_scope", "greeting", "insufficient_evidence"]
@@ -69,40 +67,65 @@ class Dataset(BaseModel):
         return self
 
 
-def load_dataset(path: Path, source: Path) -> tuple[Dataset, dict]:
+def load_dataset(path: Path, repository: PolicyRepository) -> tuple[Dataset, dict, dict]:
     dataset = Dataset.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
-    if git(source, "rev-parse", "HEAD") != dataset.corpus_commit or git(
-        source, "status", "--porcelain"
-    ):
-        raise ValueError("Evaluation source must be clean and match the dataset corpus commit.")
-    anchors = {}
-    policy_root = (source / "Policies").resolve()
+    directory = repository.list_documents()
+    if directory["commit"] != dataset.corpus_commit:
+        raise ValueError("Evaluation source must match the dataset's immutable policy commit.")
+    anchors, documents = {}, {}
     for key, ref in dataset.references.items():
-        target = (source / ref.path).resolve()
-        if not target.is_relative_to(policy_root) or target.suffix != ".md":
-            raise ValueError(f"Invalid reference path: {ref.path}")
-        content = target.read_text(encoding="utf-8")
+        if ref.path not in documents:
+            repository.read_document(ref.path)
+            documents[ref.path] = "\n".join(repository.files[ref.path])
+        content = documents[ref.path]
         offset = content.find(ref.contains)
         if offset < 0:
-            raise ValueError(f"Reference text missing from corpus: {key}")
+            raise ValueError(f"Reference text missing from GitHub snapshot: {key}")
         start = content[:offset].count("\n") + 1
         end = start + ref.contains.count("\n")
         anchors[key] = {**ref.model_dump(), "start_line": start, "end_line": end}
-    return dataset, anchors
+    return dataset, anchors, documents
 
 
-def structural_checks(response: dict, turn: EvalTurn, anchors: dict, database: Path, commit: str):
+def structural_checks(
+    response: dict,
+    turn: EvalTurn,
+    anchors: dict,
+    documents: dict[str, str],
+    commit: str,
+    trace: list[dict],
+):
     citations = response.get("citations", [])
-    with connect(database) as db:
-        known = {row["chunk_id"]: dict(row) for row in db.execute("SELECT * FROM chunks")}
+    reads = [item for item in trace if item.get("event") == "read"]
     valid = True
     for citation in citations:
-        row = known.get(citation.get("chunk_id"))
-        if not row or any(
-            citation.get(key) != row[key]
-            for key in ("path", "content", "source_url", "start_line", "end_line", "commit_sha")
+        path, start, end = (citation.get(k) for k in ("path", "start_line", "end_line"))
+        content = documents.get(path)
+        if content is None:
+            valid = False
+            continue
+        lines = content.splitlines()
+        if (
+            not isinstance(start, int)
+            or not isinstance(end, int)
+            or not 1 <= start <= end <= len(lines)
         ):
             valid = False
+            continue
+        url = f"{REPOSITORY_URL}/blob/{commit}/{quote(path, safe='/')}#L{start}-L{end}"
+        read_matches = any(
+            item.get("path") == path
+            and item["start_line"] <= start <= end <= item["end_line"]
+            and item["source_id"] == citation.get("source_id")
+            and item["source_id"]
+            == hashlib.sha256(
+                f"{commit}:{path}:{item['start_line']}:{item['end_line']}".encode()
+            ).hexdigest()[:20]
+            for item in reads
+        )
+        valid = valid and read_matches and citation.get("commit_sha") == commit
+        valid = valid and citation.get("source_url") == url
+        valid = valid and citation.get("content") == "\n".join(lines[start - 1 : end])
     labels = [c.get("label") for c in citations]
     markers = [int(value) for value in re.findall(r"\[(\d+)\]", response.get("answer", ""))]
     valid = valid and labels == list(range(1, len(citations) + 1)) and set(markers) == set(labels)
@@ -122,7 +145,8 @@ def structural_checks(response: dict, turn: EvalTurn, anchors: dict, database: P
         "expected_kind": response.get("kind") in turn.expected_kinds,
         "citation_provenance": bool(valid),
         "policy_answer_has_citations": response.get("kind") != "answered" or bool(citations),
-        "corpus_version": response.get("corpus_commit") == commit,
+        "source_version": response.get("source_commit") in (commit, None)
+        and (not citations or response.get("source_commit") == commit),
         "expected_document_coverage": len(expected_paths & cited_paths) / len(expected_paths)
         if expected_paths
         else None,
@@ -130,7 +154,28 @@ def structural_checks(response: dict, turn: EvalTurn, anchors: dict, database: P
     }
 
 
-def evaluate(dataset: Dataset, anchors: dict, service: ChatService, limit: int | None = None):
+def evaluate(
+    dataset: Dataset,
+    anchors: dict,
+    service: ChatService,
+    documents: dict[str, str],
+    limit: int | None = None,
+    *,
+    source_repository: PolicyRepository | None = None,
+    workers: int = 1,
+):
+    if workers > 1:
+
+        def run_case(case):
+            subset = dataset.model_copy(update={"cases": [case]})
+            with service.repository_factory(service.settings) as validator:
+                validator.list_documents()
+                return evaluate(
+                    subset, anchors, service, dict(documents), source_repository=validator
+                )[0]
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            return list(pool.map(run_case, dataset.cases[:limit]))
     results = []
     for case in dataset.cases[:limit]:
         history = []
@@ -148,11 +193,19 @@ def evaluate(dataset: Dataset, anchors: dict, service: ChatService, limit: int |
                 },
             }
             try:
-                response = service.chat(turn.question, history, include_trace=True)
+                response = service.chat(turn.question, history[-20:], include_trace=True)
                 item["trace"] = response.pop("trace", [])
                 item["response"] = response
+                # A valid answer may cite a different supporting policy than a gold anchor.
+                # Verify that original independently, without giving oracle text to the agent.
+                if source_repository is not None:
+                    for citation in response.get("citations", []):
+                        path = citation["path"]
+                        if path not in documents:
+                            source_repository.read_document(path)
+                            documents[path] = "\n".join(source_repository.files[path])
                 item["checks"] = structural_checks(
-                    response, turn, anchors, service.settings.database, dataset.corpus_commit
+                    response, turn, anchors, documents, dataset.corpus_commit, item["trace"]
                 )
                 history.append(HistoryTurn(question=turn.question, answer=response["answer"]))
             except Exception as exc:
@@ -185,43 +238,47 @@ def main():
     parser.add_argument("--dataset", type=Path, default=Path("evals/datasets/answers.yaml"))
     parser.add_argument("--output", type=Path, default=Path("evals/reports/answers-live.json"))
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--workers", type=int, default=1, choices=range(1, 5))
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be positive")
-    settings = Settings()
-    dataset, anchors = load_dataset(args.dataset, settings.data_dir / "source" / "site-policy")
-    if not args.live:
-        print(
-            json.dumps(
-                {
-                    "validated_cases": len(dataset.cases),
-                    "validated_turns": sum(len(c.turns) for c in dataset.cases),
-                    "source_anchors": len(anchors),
-                    "live_model": False,
-                }
+    dataset_config = Dataset.model_validate(
+        yaml.safe_load(args.dataset.read_text(encoding="utf-8"))
+    )
+    settings = Settings(github_ref=dataset_config.corpus_commit)
+    # Expected-source text is held in evaluator memory, never supplied to the agent.
+    with PolicyRepository(settings) as repository:
+        dataset, anchors, documents = load_dataset(args.dataset, repository)
+        if not args.live:
+            print(
+                json.dumps(
+                    {
+                        "validated_cases": len(dataset.cases),
+                        "validated_turns": sum(len(c.turns) for c in dataset.cases),
+                        "source_anchors": len(anchors),
+                        "live_model": False,
+                        "source_mode": "github-online",
+                    }
+                )
             )
+            return
+        create_chat(settings)  # Configuration check only; no generation.
+        results = evaluate(
+            dataset,
+            anchors,
+            ChatService(settings),
+            documents,
+            args.limit,
+            source_repository=repository,
+            workers=args.workers,
         )
-        return
-    create_chat(settings)  # Fail fast on missing provider configuration; no generation request.
-    status = corpus_status(settings.database)
-    if status["commit"] != dataset.corpus_commit:
-        parser.error("Indexed corpus does not match the dataset; sync and index the pinned source.")
-    # Freeze evaluation evidence in a temporary corpus copy; context remains in memory.
-    with tempfile.TemporaryDirectory(prefix="policy-eval-", dir=settings.data_dir) as temp:
-        evaluation_settings = settings.model_copy(update={"data_dir": Path(temp)})
-        with (
-            closing(sqlite3.connect(settings.database)) as source,
-            closing(sqlite3.connect(evaluation_settings.database)) as target,
-        ):
-            source.backup(target)
-        results = evaluate(dataset, anchors, ChatService(evaluation_settings), args.limit)
     turns = [turn for case in results for turn in case["turns"]]
     completed = [turn for turn in turns if "checks" in turn]
     check_names = (
         "expected_kind",
         "citation_provenance",
         "policy_answer_has_citations",
-        "corpus_version",
+        "source_version",
     )
     rates = {
         name: sum(bool(turn["checks"][name]) for turn in completed) / len(completed)
@@ -234,12 +291,11 @@ def main():
         "live_model": True,
         "timestamp": datetime.now(UTC).isoformat(),
         "dataset_version": dataset.version,
-        "corpus": status,
+        "policy_source": {"repository": REPOSITORY_URL, "commit": dataset.corpus_commit},
         "chat_provider": settings.chat_provider,
         "chat_model": settings.chat_model,
-        "embedding_provider": settings.embedding_provider,
-        "embedding_model": settings.embedding_model,
-        "retrieval_mode": settings.retrieval_mode,
+        "source_mode": "github-online",
+        "workers": args.workers,
         "conversation_mode": "caller-owned-memory",
         "cases": results,
         "summary": {

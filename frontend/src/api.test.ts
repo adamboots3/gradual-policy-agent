@@ -14,8 +14,8 @@ it("sends bounded question/answer context without stored IDs, sources or metadat
     question: `Question ${index}`,
     response: {
       kind: "answered",
-      corpus_commit: "test",
-      search_calls: 1,
+      source_commit: "test",
+      read_calls: 1,
       latency_ms: 1,
       answer: `Answer ${index}`,
       run_id: "not-context",

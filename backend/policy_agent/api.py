@@ -7,14 +7,8 @@ from pydantic import BaseModel, Field, StringConstraints
 from policy_agent.chat import ChatService, HistoryTurn
 from policy_agent.config import Settings
 from policy_agent.context import ContextWindowError
+from policy_agent.github_source import REPOSITORY_URL, PolicySourceError
 from policy_agent.providers import ConfigurationError
-from policy_agent.retrieval import corpus_status
-from policy_agent.semantic import Retriever
-
-
-class SearchRequest(BaseModel):
-    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
-    limit: int = Field(default=6, ge=1, le=20)
 
 
 class MessageRequest(BaseModel):
@@ -26,7 +20,6 @@ def create_app(settings: Settings | None = None, service=None) -> FastAPI:
     settings = settings or Settings()
     app = FastAPI(title="GitHub Policy Support Agent", version="0.1.0")
     service = service or ChatService(settings)
-    retriever = Retriever(settings)
 
     @app.exception_handler(ConfigurationError)
     def configuration_error(request: Request, exc: ConfigurationError):
@@ -48,34 +41,34 @@ def create_app(settings: Settings | None = None, service=None) -> FastAPI:
         return {
             "status": "ok",
             "stage": "agent-backend",
-            "retrieval_mode": settings.retrieval_mode,
+            "source_mode": "github-online",
             "chat_configured": bool(settings.chat_provider and settings.chat_model),
             "conversation_mode": "window-memory",
         }
 
-    @app.get("/api/knowledge")
-    def knowledge():
-        return corpus_status(settings.database)
+    @app.exception_handler(PolicySourceError)
+    def source_error(request: Request, exc: PolicySourceError):
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
 
-    @app.post("/api/knowledge/search")
-    def retrieve(request: SearchRequest):
-        if not corpus_status(settings.database)["chunks"]:
-            raise HTTPException(503, "Knowledge base is empty. Run sync and index first.")
+    @app.get("/api/policies")
+    def policies():
+        # Configuration only: page startup never spends GitHub API quota.
         return {
-            "results": retriever.search(request.query, request.limit),
-            "retrieval_mode": settings.retrieval_mode,
+            "repository": REPOSITORY_URL,
+            "ref": settings.github_ref,
+            "source_mode": "github-online",
         }
 
     @app.post("/api/chat")
     def send_message(request: MessageRequest):
         try:
             return service.chat(request.content, request.history)
-        except (ConfigurationError, ContextWindowError):
+        except (ConfigurationError, ContextWindowError, PolicySourceError):
             raise
         except Exception as exc:
             raise HTTPException(
                 502,
-                "Model or retrieval request failed. Check provider configuration "
+                "Model or policy-reading request failed. Check provider configuration "
                 "and retry; the server does not save conversations.",
             ) from exc
 

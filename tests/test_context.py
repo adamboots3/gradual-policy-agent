@@ -60,32 +60,34 @@ def test_profile_fallback_and_explicit_window():
 
 def test_budget_is_rechecked_after_retrieval_without_breaking_tool_pairs(corpus):
     history = [HistoryTurn(question=f"Q{i}:" + "q" * 200, answer="a" * 200) for i in range(20)]
-    settings = Settings(data_dir=corpus[1].parent)
-    probe = ScriptedModel(call("search_policies", query="appeals"), cited_answer)
-    service = ChatService(settings, lambda _: probe)
-    rows = service.retriever.search("appeals")
-    rows[0]["content"] = "Retrieved evidence " * 400
-
-    class Retriever:
-        def search(self, query):
-            return rows
-
-    service.retriever = Retriever()
+    settings = Settings()
+    corpus.files["Policies/appeals.md"] = "Retrieved evidence " * 10 + "\n"
+    corpus.files["Policies/appeals.md"] *= 80
+    probe = ScriptedModel(
+        call("list_policy_documents"),
+        call("read_policy_document", path="Policies/appeals.md"),
+        cited_answer,
+    )
+    service = ChatService(settings, lambda _: probe, corpus.factory)
     service.chat("Now?", history)
     budget = ContextBudget.for_model(settings, probe)
     # Allow all history at first, but only 18 turns once the large tool reply arrives.
-    second_without_two_turns = [probe.inputs[1][0], *probe.inputs[1][5:]]
+    second_without_two_turns = [probe.inputs[2][0], *probe.inputs[2][5:]]
     settings.chat_context_window_tokens = (
         budget.estimate(second_without_two_turns, probe.tools) + budget.output + budget.margin
     )
-    model = ScriptedModel(call("search_policies", query="appeals"), cited_answer)
+    model = ScriptedModel(
+        call("list_policy_documents"),
+        call("read_policy_document", path="Policies/appeals.md"),
+        cited_answer,
+    )
     service.model_factory = lambda _: model
     response = service.chat("Now?", history, include_trace=True)
     assert len([m for m in model.inputs[0] if isinstance(m, HumanMessage)]) == 21
-    second = model.inputs[1]
+    second = model.inputs[2]
     assert second[1].content == history[2].question
     assert second[2].content == history[2].answer
-    assert second[-3].content == "Now?"
+    assert second[-5].content == "Now?"
     assert isinstance(second[-2], AIMessage) and isinstance(second[-1], ToolMessage)
     assert second[-2].tool_calls[0]["id"] == second[-1].tool_call_id
     assert response["context"] == {
@@ -93,7 +95,7 @@ def test_budget_is_rechecked_after_retrieval_without_breaking_tool_pairs(corpus)
         "history_turns_used": 18,
         "history_turns_trimmed": 2,
     }
-    assert model.invocation_options == [{"max_tokens": 2048}] * 2
+    assert model.invocation_options == [{"max_tokens": 2048}] * 3
     assert any(t["event"] == "context_trim" for t in response["trace"])
     assert len(history) == 20
 
@@ -106,7 +108,7 @@ def test_provider_overflow_trims_oldest_until_accepted(corpus):
     )
     fresh = ScriptedModel(greeting())
     models = iter([model, fresh])
-    service = ChatService(Settings(data_dir=corpus[1].parent), lambda _: next(models))
+    service = ChatService(Settings(), lambda _: next(models), corpus.factory)
     history = [HistoryTurn(question=q, answer="A") for q in ["Old", "New"]]
     result = service.chat("Now", history, include_trace=True)
     assert [
@@ -126,7 +128,7 @@ def test_provider_overflow_trims_oldest_until_accepted(corpus):
 def test_overflow_retries_stop_when_all_historical_pairs_are_removed(corpus):
     error = ProviderError("prompt is too long")
     model = ScriptedModel(error, error, error, greeting())
-    service = ChatService(Settings(data_dir=corpus[1].parent), lambda _: model)
+    service = ChatService(Settings(), lambda _: model, corpus.factory)
     with pytest.raises(ContextWindowError):
         service.chat("Now", [HistoryTurn(question="Q", answer="A")] * 2)
     assert len(model.inputs) == 3
@@ -144,7 +146,7 @@ def test_overflow_retries_stop_when_all_historical_pairs_are_removed(corpus):
 )
 def test_unrelated_errors_are_not_retried_or_trimmed(corpus, error):
     model = ScriptedModel(error, greeting())
-    service = ChatService(Settings(data_dir=corpus[1].parent), lambda _: model)
+    service = ChatService(Settings(), lambda _: model, corpus.factory)
     with pytest.raises(type(error)):
         service.chat("Now", [HistoryTurn(question="Old", answer="A")])
     assert len(model.inputs) == 1
@@ -154,11 +156,11 @@ def test_unrelated_errors_are_not_retried_or_trimmed(corpus, error):
 def test_no_history_left_returns_clear_422_without_leaking_provider_details(
     corpus, provider_rejects
 ):
-    settings = Settings(data_dir=corpus[1].parent)
+    settings = Settings()
     model = ScriptedModel(ProviderError("secret debug text", code="context_length_exceeded"))
     if not provider_rejects:
         settings.chat_context_window_tokens = 2600  # Only 40 input tokens after reserve.
-    service = ChatService(settings, lambda _: model)
+    service = ChatService(settings, lambda _: model, corpus.factory)
     with TestClient(create_app(settings, service)) as client:
         response = client.post("/api/chat", json={"content": "Now"})
     assert response.status_code == 422

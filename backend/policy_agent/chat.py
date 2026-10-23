@@ -10,9 +10,8 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from policy_agent.agent import PROMPT_VERSION, build_agent
 from policy_agent.config import Settings
-from policy_agent.providers import ConfigurationError, create_chat
-from policy_agent.retrieval import corpus_status
-from policy_agent.semantic import Retriever
+from policy_agent.github_source import PolicyRepository
+from policy_agent.providers import create_chat
 
 
 class HistoryTurn(BaseModel):
@@ -25,10 +24,12 @@ class HistoryTurn(BaseModel):
 
 
 class ChatService:
-    def __init__(self, settings: Settings, model_factory=create_chat, retriever=None):
+    def __init__(
+        self, settings: Settings, model_factory=create_chat, repository_factory=PolicyRepository
+    ):
         self.settings = settings
         self.model_factory = model_factory
-        self.retriever = retriever or Retriever(settings)
+        self.repository_factory = repository_factory
 
     def chat(
         self,
@@ -41,9 +42,6 @@ class ChatService:
             raise ValueError("Question must contain 1–4000 characters.")
         if len(history) > 20:
             raise ValueError("At most 20 completed context turns are accepted.")
-        corpus = corpus_status(self.settings.database)
-        if not corpus["chunks"]:
-            raise ConfigurationError("Knowledge base is empty. Run sync and index first.")
         messages = []
         for turn in history:
             turn = HistoryTurn.model_validate(turn)
@@ -51,30 +49,32 @@ class ChatService:
         messages.append(HumanMessage(content=question.strip()))
         started = time.perf_counter()
         # Every invocation starts fresh, without a checkpointer or shared dialogue state.
-        graph = build_agent(self.model_factory(self.settings), self.retriever, self.settings)
-        state = graph.invoke(
-            {
-                "messages": messages,
-                "history_turns": len(history),
-                "evidence": {},
-                "search_calls": 0,
-                "model_calls": 0,
-                "result": {},
-                "trace": [],
-                "question": question.strip(),
-            },
-            {"recursion_limit": 40},
-        )
-        if corpus != corpus_status(self.settings.database):
-            raise ConfigurationError("Corpus changed during this turn. Please retry.")
+        with self.repository_factory(self.settings) as repository:
+            graph = build_agent(self.model_factory(self.settings), repository, self.settings)
+            state = graph.invoke(
+                {
+                    "messages": messages,
+                    "history_turns": len(history),
+                    "evidence": {},
+                    "read_calls": 0,
+                    "directory_calls": 0,
+                    "model_calls": 0,
+                    "result": {},
+                    "trace": [],
+                    "question": question.strip(),
+                },
+                {"recursion_limit": 70},
+            )
+            commit = repository.commit
         result = {
             **state["result"],
             "run_id": str(uuid4()),
-            "corpus_commit": corpus["commit"],
+            "source_commit": commit,
+            "source_mode": "github-online",
+            "directory_calls": state["directory_calls"],
             "prompt_version": PROMPT_VERSION,
             "model": self.settings.chat_model,
             "provider": self.settings.chat_provider,
-            "retrieval_mode": self.settings.retrieval_mode,
             "latency_ms": round((time.perf_counter() - started) * 1000),
             "model_calls": state["model_calls"],
             "context": {

@@ -258,3 +258,56 @@ events in explicit evaluation traces, bounded by at most 20 removed pairs.
 The preceding web-only commit `4bc4639` passed all five jobs in
 [GitHub Actions](https://github.com/adamboots3/gradual-policy-agent/actions/runs/39989034601).
 This context-budget revision has been verified locally and has not yet been pushed.
+
+
+## Online GitHub policy reading — 2026-10-24 (Asia/Shanghai)
+
+Replaces local policy storage, ingestion/chunking, FTS/vector retrieval and embedding
+configuration with three model tools: list policy documents, read selected original
+files/ranges, submit numbered original-line citations. One commit is fixed per
+question; metadata/bodies are held only in that request's memory. Existing local
+artifacts are not consulted. The prior 20-turn frontend context and oldest-first
+budgeting remain, including after online tool returns.
+
+Executed checks:
+
+- **69 backend tests passed in 2.59s**; Ruff lint/format and Git whitespace checks
+  passed. Replaced removed-index tests with mocked GitHub tests: snapshot consistency,
+  request-only caching, exact listed paths, symlink exclusion, truncated trees,
+  blob identity, bounded pagination, timeouts/rate limits, source-failure handling,
+  exact line citations and multiple independent passages from the same read.
+  Existing temporary-context, oldest-first trimming, tool-pair integrity, concurrent
+  isolation, no-history persistence and sanitized error checks remain passing.
+- **13 frontend tests passed**, formatting and TypeScript/production build passed.
+  Covered temporary follow-ups/reset/error behavior plus online-source metadata,
+  null-commit greetings and independent selection of passages sharing a source ID.
+- Updated locked dependencies without upgrading remaining packages. Removed NumPy;
+  promoted HTTPX to a runtime dependency. Fresh production-only install with all
+  adapters starts/imports the API and serves health/source configuration without
+  NumPy, SQLite checkpointer or policy initialization. PyYAML remains a transitive
+  framework dependency, not application ingestion code.
+- Two complete live online-agent runs, both 45 scenarios / 51 turns and zero request
+  errors. Initial v1 had 43/51 expected kinds, exposing repeated rejection of multiple
+  excerpts from one read. Fixed by numbered citation entries. Final v2 had **50/51
+  expected kinds**, **51/51 provenance**, citation-presence and version checks;
+  expected-document coverage 94.4%, anchor coverage 92.2%. Both original reports
+  are retained. Initial run sequential; final run used three independent workers.
+- Final median request latency 7.50s, max 14.17s. This is not a controlled performance
+  comparison or an accuracy score. Agent review identifies missed file selection,
+  weaker supporting passages, uncited qualifications and one response-kind mismatch;
+  see ONLINE_RESULTS.md. Independent human semantic review remains open.
+- Evaluation used the existing GitHub login only for read-only source requests;
+  credentials were not persisted in reports. Local chat credentials were unchanged;
+  obsolete embedding/retrieval settings were removed from the ignored local `.env`.
+- Real web checks used temporary ports 8001/5174, leaving existing services intact.
+  Chinese appeal question, contextual follow-up, original citation panel and New chat
+  reset were exercised. Current captures are `online-policy-chat.png` and `online-policy-answer.png`
+  at the default 614x700 viewport.
+- Container source was simplified: no Git installation, policy initialization or
+  data volume. Docker is unavailable on this host, so a new container run and remote
+  Windows/Linux CI have not been executed for this local revision.
+
+Runtime code imports neither the former policy database nor embedding/index modules;
+former knowledge-search/setup routes and commands are gone. Historical answer and
+retrieval reports remain labeled as such. No public deployment, model key publication
+or GitHub push was performed for this revision.

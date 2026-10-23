@@ -1,8 +1,12 @@
 """Scripted test doubles. These never represent live-model quality."""
 
+import base64
+import hashlib
 import json
 
+import httpx
 from langchain_core.messages import AIMessage, ToolMessage
+from policy_agent.github_source import PolicyRepository
 
 
 def call(name, **args):
@@ -12,14 +16,21 @@ def call(name, **args):
 def cited_answer(messages):
     for message in reversed(messages):
         if isinstance(message, ToolMessage):
-            rows = json.loads(message.content).get("evidence", [])
-            if rows:
+            row = json.loads(message.content)
+            if "source_id" in row:
                 return call(
                     "submit_answer",
                     kind="answered",
-                    answer=f"You can appeal using the form. [[{rows[0]['chunk_id']}]]",
+                    answer="You can appeal using the form. [[1]]",
+                    citations=[
+                        {
+                            "source_id": row["source_id"],
+                            "start_line": row["start_line"],
+                            "end_line": min(row["end_line"], row["start_line"] + 79),
+                        }
+                    ],
                 )
-    raise AssertionError("Script expected retrieved evidence")
+    raise AssertionError("Script expected a current-turn document read")
 
 
 class ScriptedModel:
@@ -43,13 +54,70 @@ class ScriptedModel:
         return response(messages) if callable(response) else response
 
 
-class FakeEmbeddings:
+POLICY = """# Example appeals policy
+
+Users can appeal an account suspension using the reinstatement form.
+
+## Deadlines
+
+Appeals may be submitted within six months following the decision.
+"""
+
+
+class GitHubFixture:
+    commit = "a" * 40
+    tree = "b" * 40
+
     def __init__(self):
-        self.document_calls = []
+        self.files = {
+            "Policies/appeals.md": POLICY,
+            "Policies/privacy/privacy-policy.md": "# Privacy\n\nPrivacy policy text.\n",
+        }
+        self.calls = []
 
-    def embed_documents(self, texts):
-        self.document_calls.append(texts)
-        return [[0.1, 1.0] if "six months" in text else [1.0, 0.1] for text in texts]
+    @staticmethod
+    def digest(raw):
+        return hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
 
-    def embed_query(self, text):
-        return [0.1, 1.0] if "期限" in text or "deadline" in text else [1.0, 0.1]
+    def respond(self, request):
+        self.calls.append(request)
+        path = request.url.path
+        if "/commits/" in path:
+            return httpx.Response(
+                200, json={"sha": self.commit, "commit": {"tree": {"sha": self.tree}}}
+            )
+        if "/git/trees/" in path:
+            return httpx.Response(
+                200,
+                json={
+                    "truncated": False,
+                    "tree": [
+                        {
+                            "path": p,
+                            "sha": self.digest(t.encode()),
+                            "size": len(t.encode()),
+                            "type": "blob",
+                            "mode": "100644",
+                        }
+                        for p, t in self.files.items()
+                    ],
+                },
+            )
+        for text in self.files.values():
+            raw = text.encode()
+            if path.endswith("/git/blobs/" + self.digest(raw)):
+                return httpx.Response(
+                    200, json={"encoding": "base64", "content": base64.b64encode(raw).decode()}
+                )
+        return httpx.Response(404)
+
+    def factory(self, settings):
+        return PolicyRepository(settings, transport=httpx.MockTransport(self.respond))
+
+
+def answering_model():
+    return ScriptedModel(
+        call("list_policy_documents"),
+        call("read_policy_document", path="Policies/appeals.md"),
+        cited_answer,
+    )

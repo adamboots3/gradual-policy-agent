@@ -25,31 +25,3 @@ def create_chat(settings: Settings):
         raise ConfigurationError(
             "Install the selected LangChain provider integration first."
         ) from exc
-
-
-def create_embeddings(settings: Settings):
-    from langchain.embeddings import init_embeddings
-
-    if not settings.embedding_provider or not settings.embedding_model:
-        raise ConfigurationError("Set POLICY_EMBEDDING_PROVIDER and POLICY_EMBEDDING_MODEL first.")
-    kwargs = {"max_retries": 1}
-    if settings.embedding_provider == "openai":
-        # Compatible services such as Bailian expect raw strings, not token arrays.
-        kwargs.update(
-            {
-                "check_embedding_ctx_length": False,
-                "chunk_size": settings.embedding_batch_size,
-                "model_kwargs": {"encoding_format": "float"},
-                "timeout": 60,
-            }
-        )
-    if settings.embedding_api_key:
-        kwargs["api_key"] = settings.embedding_api_key
-    if settings.embedding_base_url:
-        kwargs["base_url"] = settings.embedding_base_url
-    try:
-        return init_embeddings(
-            settings.embedding_model, provider=settings.embedding_provider, **kwargs
-        )
-    except ImportError as exc:
-        raise ConfigurationError("Install the selected embedding integration first.") from exc
