@@ -102,13 +102,33 @@ text. `POST /api/chat` handles a request with optional window-owned context:
 }
 ```
 
-No conversation ID or cookie is required. At most 20 bounded completed pairs are
-accepted; the model receives the last six by default (`POLICY_HISTORY_TURNS`).
+No conversation ID or cookie is required. The frontend sends its most recent 20
+completed question/answer pairs; all supplied pairs enter model context when they
+fit. Before **every** model call (including after retrieval), the backend budgets
+system text, tool schemas, history, the current question and current-turn tool
+messages, plus reserved output and a safety margin. It removes oldest complete
+pairs until the estimated input fits; it never summarizes history or splits a
+current-turn tool call/result pair. A recognized provider context-overflow error
+triggers further oldest-pair removal and retry, bounded by the remaining history.
+
+Set `POLICY_CHAT_CONTEXT_WINDOW_TOKENS` to your model's total context capacity,
+especially for compatible endpoints/custom model names. The default `0` uses the
+LangChain model profile when available, otherwise a **32,768-token fallback**, not
+automatic discovery of a custom endpoint's capacity. Output is capped by
+`POLICY_CHAT_MAX_OUTPUT_TOKENS` (default 2,048), with
+`POLICY_CHAT_CONTEXT_MARGIN_TOKENS` (default 512) reserved as additional headroom.
+Counting uses a conservative local approximation with a non-ASCII allowance;
+different tokenizers may cause earlier trimming or a provider overflow retry.
+The obsolete `POLICY_HISTORY_TURNS` setting has no effect.
+
 Context is untrusted and is used to interpret follow-ups; policy claims still need
 current-turn retrieval. The response includes answer, citations and diagnostic
-metadata, without saved run records or ordinary tool traces. Chat responses use
-`Cache-Control: no-store`. Configuration failures return 503; provider errors return
-a sanitized 502. The application has no authentication. Stop chat requests before
+metadata, including `context.history_turns_received/used/trimmed`, without saved
+run records or ordinary tool traces. Trimming affects this request's LLM input;
+the displayed page history remains intact. Chat responses use
+`Cache-Control: no-store`. If current-turn material cannot fit even after all
+history is removed, the API returns a clear 422. Configuration failures return 503;
+other provider errors return a sanitized 502. The application has no authentication. Stop chat requests before
 replacing the corpus.
 
 ## Verify

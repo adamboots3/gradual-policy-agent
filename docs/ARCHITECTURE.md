@@ -70,12 +70,32 @@ float vectors. Chat and embedding services are independently configurable.
 ## Request-scoped agent
 
 `ChatService.chat(question, history)` creates a fresh graph invocation. History is
-caller-owned, limited to completed question/answer pairs, at most 20 pairs; the last
-six enter model context by default. It is never used as policy evidence. No model
+caller-owned, limited to completed question/answer pairs, at most 20 pairs. All
+supplied pairs are used when they fit. It is never used as policy evidence. No model
 initialization or paid request occurs at import, health checks or corpus indexing.
 
+Before every model call, `ContextBudget` estimates input tokens for system text,
+tool definitions, history, the current question and all current-turn messages. It
+subtracts the configured output cap and safety margin from the model's context
+capacity. It drops oldest **whole question/answer pairs** until the input fits.
+The next call after retrieval repeats this check; AI tool calls and their matching
+results remain together, with the current question and agent execution intact.
+History from an earlier request's agent execution is never imported.
+
+Capacity comes from `POLICY_CHAT_CONTEXT_WINDOW_TOKENS`, or (when zero) LangChain's
+model profile, with a documented 32,768-token fallback for unknown models. Output
+defaults to 2,048 tokens (also passed to the model as `max_tokens`); the default
+margin is 512. Token counting is a local LangChain approximation with a UTF-8
+allowance, not an exact vendor tokenizer. Recognized provider context errors drop
+one more oldest pair and retry until accepted or no history remains. No network,
+authentication or rate-limit errors trigger this retry. If mandatory current-turn
+material cannot fit without history, return 422 instead of breaking tool messages
+or fabricating a policy refusal. No automatic summaries are created.
+
 The model calls `search_policies` and `submit_answer`; defaults are three searches
-and six model calls per turn. State includes messages, evidence, counts and an
+and six successful model responses per turn. Overflow retries are additionally
+bounded by the at-most-20 historical pairs and appear in explicit evaluation traces.
+State includes messages, remaining history count, evidence, counts and an
 in-memory trace. Errors do not leave a partial turn behind. Separate requests do
 not share messages, evidence or budgets; conversation locks are no longer needed.
 
@@ -104,7 +124,9 @@ on page exit. Network retries cannot append to a hidden server-side conversation
 
 ## Diagnostics, evaluation and scope
 
-Responses include model/prompt/corpus metadata, request run ID, counts and latency.
+Responses include model/prompt/corpus metadata, request run ID, counts and latency,
+plus received/used/trimmed history counts. Trimming changes only LLM input, not
+frontend display state; each new request starts from that request's supplied pairs.
 Run IDs are diagnostic labels, not database keys. No ordinary chat/run/checkpoint
 record is written. Explicit evaluations request a transient trace and write their
 synthetic cases to reports; context resets between scenarios. Corpus copies keep

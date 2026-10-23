@@ -46,16 +46,21 @@ def test_server_restart_has_no_history_to_restore(corpus):
     assert "Context from an old process" not in str(model.inputs[0])
 
 
-def test_history_is_bounded_and_legacy_databases_are_not_read(corpus):
+def test_all_twenty_frontend_turns_are_used_and_legacy_databases_are_not_read(corpus, monkeypatch):
     legacy = corpus[1].parent / "conversations.sqlite3"
     legacy.write_bytes(b"Old dialogue storage must never be opened")
     model = answering_model()
+    monkeypatch.setenv("POLICY_HISTORY_TURNS", "6")  # Obsolete setting has no effect.
     service = service_for(corpus, model)
-    service.settings.history_turns = 1
-    service.chat(
-        "Now?", [HistoryTurn(question=q, answer="Earlier answer") for q in ["Old", "Last"]]
-    )
-    assert [m.content for m in model.inputs[0] if isinstance(m, HumanMessage)] == ["Last", "Now?"]
+    history = [HistoryTurn(question=f"Question {i}", answer=f"Answer {i}") for i in range(20)]
+    service.chat("Now?", history)
+    assert [m.content for m in model.inputs[0] if isinstance(m, HumanMessage)] == [
+        *[turn.question for turn in history],
+        "Now?",
+    ]
+    assert [m.content for m in model.inputs[0] if isinstance(m, AIMessage)] == [
+        turn.answer for turn in history
+    ]
     assert legacy.read_bytes() == b"Old dialogue storage must never be opened"
 
 

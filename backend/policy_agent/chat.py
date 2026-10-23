@@ -45,18 +45,17 @@ class ChatService:
         if not corpus["chunks"]:
             raise ConfigurationError("Knowledge base is empty. Run sync and index first.")
         messages = []
-        for turn in history[-self.settings.history_turns :]:
+        for turn in history:
             turn = HistoryTurn.model_validate(turn)
             messages.extend([HumanMessage(content=turn.question), AIMessage(content=turn.answer)])
         messages.append(HumanMessage(content=question.strip()))
         started = time.perf_counter()
         # Every invocation starts fresh, without a checkpointer or shared dialogue state.
-        graph = build_agent(
-            self.model_factory(self.settings), self.retriever, self.settings.max_search_calls
-        )
+        graph = build_agent(self.model_factory(self.settings), self.retriever, self.settings)
         state = graph.invoke(
             {
                 "messages": messages,
+                "history_turns": len(history),
                 "evidence": {},
                 "search_calls": 0,
                 "model_calls": 0,
@@ -78,6 +77,11 @@ class ChatService:
             "retrieval_mode": self.settings.retrieval_mode,
             "latency_ms": round((time.perf_counter() - started) * 1000),
             "model_calls": state["model_calls"],
+            "context": {
+                "history_turns_received": len(history),
+                "history_turns_used": state["history_turns"],
+                "history_turns_trimmed": len(history) - state["history_turns"],
+            },
         }
         if include_trace:
             # Explicit evaluation output only; ordinary chat never saves or returns traces.

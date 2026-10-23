@@ -9,6 +9,13 @@ from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemM
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, StringConstraints, ValidationError
 
+from policy_agent.config import Settings
+from policy_agent.context import (
+    CONTEXT_ERROR,
+    ContextBudget,
+    ContextWindowError,
+    is_context_overflow,
+)
 from policy_agent.providers import ConfigurationError
 
 PROMPT_VERSION = "policy-agent-v2"
@@ -46,6 +53,7 @@ class AnswerInput(BaseModel):
 
 class AgentState(TypedDict):
     messages: list[AnyMessage]
+    history_turns: int
     evidence: dict[str, dict]
     search_calls: int
     model_calls: int
@@ -81,7 +89,9 @@ def validate_answer(value: dict, evidence: dict, search_calls: int) -> dict:
     }
 
 
-def build_agent(model, retriever, max_search_calls: int = 3):
+def build_agent(model, retriever, settings: Settings):
+    max_search_calls = settings.max_search_calls
+
     @tool(args_schema=SearchInput)
     def search_policies(query: str) -> list[dict]:
         """Search the versioned GitHub policy corpus; returns evidence with citation IDs."""
@@ -92,26 +102,46 @@ def build_agent(model, retriever, max_search_calls: int = 3):
         """Submit the final response; policy claims require inline [[chunk_id]] citations."""
         return {"kind": kind, "answer": answer}
 
-    bound = model.bind_tools([search_policies, submit_answer])
+    tools = [search_policies, submit_answer]
+    bound = model.bind_tools(tools)
+    budget = ContextBudget.for_model(settings, model)
     model_limit = max_search_calls + 3
 
     def decide(state: AgentState):
-        response = bound.invoke(
-            [
-                SystemMessage(
-                    content=SYSTEM + f"\nSearch budget: {max_search_calls}. "
-                    f"Searches used: {state['search_calls']}."
-                )
-            ]
-            + state["messages"]
+        system = SystemMessage(
+            content=SYSTEM + f"\nSearch budget: {max_search_calls}. "
+            f"Searches used: {state['search_calls']}."
         )
+        messages = list(state["messages"])
+        turns = state["history_turns"]
+        trace = list(state["trace"])
+        while True:
+            previous = turns
+            messages, turns, estimate = budget.fit(system, messages, turns, tools)
+            if turns < previous:
+                trace.append(
+                    {"event": "context_trim", "reason": "budget", "turns": previous - turns}
+                )
+            try:
+                response = bound.invoke([system, *messages], max_tokens=budget.output)
+                break
+            except Exception as exc:
+                if not is_context_overflow(exc):
+                    raise
+                if not turns:
+                    raise ContextWindowError(CONTEXT_ERROR) from exc
+                del messages[:2]
+                turns -= 1
+                trace.append({"event": "context_trim", "reason": "provider_overflow", "turns": 1})
         if not isinstance(response, AIMessage):
             raise ValueError("Chat provider did not return an AIMessage.")
         usage = response.usage_metadata or {}
         return {
-            "messages": state["messages"] + [response],
+            "messages": messages + [response],
+            "history_turns": turns,
             "model_calls": state["model_calls"] + 1,
-            "trace": state["trace"] + [{"event": "model", "usage": usage}],
+            "trace": trace
+            + [{"event": "model", "usage": usage, "estimated_input_tokens": estimate}],
         }
 
     def execute(state: AgentState):

@@ -37,8 +37,11 @@ Chat and embeddings use separate credentials. Tests require neither credential.
   scope; measured hybrid gains justify the extra provider, while two retrieval misses
   remain visible. A reranker would need a new comparison rather than an assumption.
 - Agent search adds bounded neighboring source chunks to recover adjacent clauses.
-- Revised scope (2026-10-24): retain the last six completed turns in model context
-  by default, supplied from page memory. No chat persistence or CLI conversation
+- Revised scope (2026-10-24): use all of the frontend's most recent 20 completed
+  pairs when they fit. Budget every model call; remove oldest complete pairs when
+  the context exceeds capacity, including after retrieval. Provider context errors
+  trigger bounded further trimming; no fixed six-turn selection remains.
+  No chat persistence or CLI conversation
   interface; no summarization, authentication or admin system.
 - Never count scripted tests or retrieval coverage as live answer quality.
 - Keep failed evaluation cases and disclose limitations rather than editing gold

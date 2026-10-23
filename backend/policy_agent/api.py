@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from policy_agent.chat import ChatService, HistoryTurn
 from policy_agent.config import Settings
+from policy_agent.context import ContextWindowError
 from policy_agent.providers import ConfigurationError
 from policy_agent.retrieval import corpus_status
 from policy_agent.semantic import Retriever
@@ -38,6 +39,10 @@ def create_app(settings: Settings | None = None, service=None) -> FastAPI:
             response.headers["Cache-Control"] = "no-store"
         return response
 
+    @app.exception_handler(ContextWindowError)
+    def context_error(request: Request, exc: ContextWindowError):
+        return JSONResponse(status_code=422, content={"detail": str(exc)})
+
     @app.get("/api/health")
     def health():
         return {
@@ -65,7 +70,7 @@ def create_app(settings: Settings | None = None, service=None) -> FastAPI:
     def send_message(request: MessageRequest):
         try:
             return service.chat(request.content, request.history)
-        except ConfigurationError:
+        except (ConfigurationError, ContextWindowError):
             raise
         except Exception as exc:
             raise HTTPException(

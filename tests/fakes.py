@@ -26,13 +26,15 @@ class ScriptedModel:
     def __init__(self, *responses):
         self.responses = list(responses)
         self.inputs = []
+        self.invocation_options = []
 
     def bind_tools(self, tools):
         self.tools = tools
         return self
 
-    def invoke(self, messages):
+    def invoke(self, messages, **kwargs):
         self.inputs.append(list(messages))
+        self.invocation_options.append(kwargs)
         if not self.responses:
             raise AssertionError("Scripted model exhausted")
         response = self.responses.pop(0)

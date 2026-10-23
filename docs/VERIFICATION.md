@@ -212,3 +212,49 @@ The complete historical answer-quality suite was not rerun for this transport/st
 change. Its failures remain open; the two-turn smoke check is not a replacement
 quality score. The previous remote CI run applies to the baseline revision, not this
 new local update. No model keys were changed or published.
+
+## Frontend-owned 20-turn context and oldest-first trimming — 2026-10-24
+
+Supersedes the fixed six-turn selection in the preceding revision. Each request
+starts from all of its supplied completed pairs (up to 20). Before every model
+call, including after search, the agent budgets system text, tool schemas, history,
+the current question and current-turn messages, with output/margin reservations.
+It removes oldest complete historical pairs; current question and tool-call/result
+relationships remain intact. Recognized provider overflow responses trigger bounded
+further trimming. No history summary or persistence was added. The page's display
+history is not changed by backend trimming.
+
+Executed checks:
+
+- Backend: **76 tests passed in 16.81s**; Ruff lint and formatting passed. Covered
+  all 20 supplied turns (including ignoring obsolete `POLICY_HISTORY_TURNS=6`),
+  schema/output/multilingual budgeting, exact fit boundaries, oldest whole-pair
+  removal after retrieval, provider-overflow retries, retry exhaustion, unrelated
+  error propagation, no-history-left 422 responses, and a fresh request after
+  trimming. Existing isolation, no-persistence, retrieval and citation regressions
+  remain passing.
+- One live follow-up using 20 synthetic completed pairs: `answered`, all 20 pairs
+  retained, zero trimmed, two successful model calls, two searches, one citation;
+  request latency 8,425ms. This verifies transport/context integration and the
+  configurable output limit; it is not a complete answer-quality evaluation.
+  Dialogue and traces were not saved.
+- Local compatible-endpoint configuration now explicitly supplies the selected
+  model's 1,000,000-token context capacity, based on the provider's published
+  [model limits](https://api-docs.deepseek.com/quick_start/pricing/). Credentials
+  were not changed; `.env` remains Git-ignored. Shared code and example config
+  remain provider-independent. Unknown models use an explicit documented fallback,
+  not an assertion that every model has the same window.
+- Frontend source and dependency locks were unchanged, so frontend checks were not
+  repeated for this backend-only change. The historical live quality suite was
+  not rerun; its documented limitations remain open.
+
+Token counts use LangChain's local approximation with a non-ASCII allowance,
+not an exact provider tokenizer. Conservative estimates may trim earlier than
+strictly necessary; recognized provider overflow retries handle underestimates.
+If current-turn material alone cannot fit, the API returns an actionable 422.
+`model_calls` counts successful responses; overflow rejections are separate trim
+events in explicit evaluation traces, bounded by at most 20 removed pairs.
+
+The preceding web-only commit `4bc4639` passed all five jobs in
+[GitHub Actions](https://github.com/adamboots3/gradual-policy-agent/actions/runs/39989034601).
+This context-budget revision has been verified locally and has not yet been pushed.
