@@ -47,7 +47,7 @@ from the same snapshot for checking. No policy bodies or embeddings are persiste
 as application data. Only explicit synthetic evaluation reports are written.
 Reports record the policy commit, prompt/model, read traces, exact citations, usage,
 latency and errors, without keys or endpoint credentials. Generated reports are
-ignored until deliberately reviewed and selected for submission.
+ignored until reviewed and explicitly selected for version control.
 
 Automatic checks measure expected-kind agreement, exact original-text provenance,
 current-turn read provenance, citation presence, source version and expected anchor

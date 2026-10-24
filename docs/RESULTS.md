@@ -1,7 +1,5 @@
 # Historical evaluation results — 2026-10-22
 
-[English](RESULTS.md) | [简体中文](RESULTS.zh-CN.md)
-
 These real runs predate the 2026-10-24 window-memory/web-only change. They are not
 new answer-quality scores for the current online-file-reading architecture.
 The local policy library, embeddings and hybrid search described below were removed
@@ -75,7 +73,7 @@ uv run python -m evals.answers --live --output evals/reports/answers-live.json
 
 Hybrid retrieval evaluation calls the embedding API, not the chat API. The live
 answer runner calls configured chat and, in hybrid mode, query-embedding APIs.
-Charges and free quota depend on the reviewer's provider account; monetary cost was
+Charges and free quota depend on the configured provider account; monetary cost was
 not independently reconciled. Token metadata is retained when the provider supplies it.
 
 ## Environment and interface

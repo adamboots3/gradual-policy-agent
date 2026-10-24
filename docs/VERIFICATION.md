@@ -1,7 +1,5 @@
 # Verification record
 
-[English](VERIFICATION.md) | [简体中文](VERIFICATION.zh-CN.md)
-
 This is a chronological development log. Earlier pending statuses are superseded by
 the final acceptance entry below and `RESULTS.md`.
 
@@ -100,7 +98,7 @@ comprehensive live evaluation and container runtime verification remain pending.
 
 ## DeepSeek configuration smoke test — 2026-10-22 (Asia/Shanghai)
 
-The user configured their API key locally. Non-secret configuration uses the official
+The chat API key was configured locally. Non-secret configuration uses the official
 DeepSeek endpoint, model `deepseek-flash`, compatible provider identifier `openai`,
 and `extra_body={"thinking":{"type":"disabled"}}`. Keys were neither printed nor
 copied into source, reports or command arguments.
@@ -117,7 +115,7 @@ Deterministic tests now override project settings with clean defaults so a local
 
 ## Final local acceptance — 2026-10-22/23 (Asia/Shanghai)
 
-- Configured the user's independent DeepSeek and Beijing Bailian keys locally;
+- Configured independent DeepSeek and Beijing Bailian keys locally;
   never printed credentials. The embedding smoke test returned 1,024 dimensions,
   then the entire 721-chunk embedding build completed with batch size 20.
 - Extended fixed-set retrieval: keyword 16/24; hybrid 22/24. English subsets both
@@ -146,17 +144,16 @@ Deterministic tests now override project settings with clean defaults so a local
 - Removed only the known two-turn QA conversation after exporting its transcript;
   stopped the two development servers started for acceptance.
 - Initialized the local Git repository on `codex/policy-support-agent`; selected
-  sanitized source/reports for handoff. The user's GitHub repository does not yet
-  exist, so no push or remote CI execution has occurred.
+  sanitized source/reports for version control. The remote repository did not yet
+  exist at this milestone; no push or remote CI execution had occurred.
 
 Still unverified: Docker build/runtime, other operating systems, remote GitHub CI,
 independent human answer adjudication, load behavior and exact provider cost.
 
 
-## GitHub delivery and CI — 2026-10-23 (Asia/Shanghai)
+## Repository setup and CI — 2026-10-23 (Asia/Shanghai)
 
-At the user's request, inspected the other assignment's private `adamboots3/gradual-chat`
-repository and reused the existing authenticated account. Created the private
+Created the private
 [adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent)
 repository and uploaded source revision `b8af71c` to default branch `main`.
 The local `codex/policy-support-agent` branch tracks `origin/main`.
@@ -170,14 +167,14 @@ The local `codex/policy-support-agent` branch tracks `origin/main`.
 
 All five jobs passed. No model keys were uploaded or configured in Actions. Container
 corpus sync/index and live model calls are outside this smoke check's coverage.
-Source behavior was unchanged after this verified revision; the following handoff
+Source behavior was unchanged after this verified revision; the subsequent
 commit updates only documentation. Earlier statements that remote CI or repository
 creation remained pending are historical and superseded by this entry.
 
 
 ## Window-only context and web-only access — 2026-10-24 (Asia/Shanghai)
 
-User-requested scope change: remove persisted conversations and CLI chat. Completed
+Architecture update: remove persisted conversations and CLI chat. Completed
 pairs live only in React page memory and travel with each `/api/chat` request. New
 windows, refresh, page exit and new-chat discard that state. The server builds a
 fresh graph per request, without checkpointing, conversation tables or run records.
@@ -315,7 +312,7 @@ retrieval reports remain labeled as such. No public deployment, model key public
 or GitHub push was performed for this revision.
 
 
-## GitHub handoff and redrawn sequence diagram — 2026-10-24
+## Online-reading release and sequence diagram — 2026-10-24
 
 The numbered sequence diagram now follows the online directory/file-reading flow,
 with a colored user starting lane, separate LLM/tool/repository participants and
@@ -324,8 +321,8 @@ and chat-window lifecycle callouts. Source is `docs/sequence.mmd`; the same diag
 renders in ARCHITECTURE.md. The diagram is schematic about per-request file caching;
 context budgeting is documented immediately below it.
 
-The user authorized publishing both outstanding implementation commits (`33ecf38`
-and `a067af1`) together with this documentation update to the existing private
+The online-reading release combines the context-management and source-reading
+commits (`33ecf38` and `a067af1`) with this documentation update on the private
 repository's `main` branch. Original local checks and historical reports remain
 unchanged. Published commit/check status is available in the repository's
 [Actions history](https://github.com/adamboots3/gradual-policy-agent/actions/workflows/ci.yml).

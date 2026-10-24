@@ -1,7 +1,5 @@
 # Architecture and contracts
 
-[English](ARCHITECTURE.md) | [简体中文](ARCHITECTURE.zh-CN.md)
-
 Agent 内部的框架职责、State、检查点与重试机制见
 [Agent 内部机制图](AGENT_INTERNALS.md)。
 

@@ -1,12 +1,12 @@
 # 最终混合检索评测的 Agent 语义检查（历史记录）
 
-[English](REVIEW.md) | [简体中文](REVIEW.zh-CN.md) | [中文文档目录](../docs/README.zh-CN.md)
+[English](REVIEW.md) | [简体中文](REVIEW.zh-CN.md) | [项目首页](../README.zh-CN.md)
 
 这是旧关键词／混合检索架构的检查，该架构已于 2026-10-24 移除。
-当前在线 Agent 的观察见[在线评测结果](../docs/ONLINE_RESULTS.zh-CN.md)。
+当前在线 Agent 的观察见[在线评测结果](../docs/ONLINE_RESULTS.md)。
 
 报告：`reports/answers-hybrid-final.json`；Prompt：`policy-agent-v2`。
-检查者是开发编码助手，不是独立人工评审或经过校准的裁判。
+检查者是开发编码助手，不是独立人工审核者或经过校准的裁判。
 检查范围：阅读全部 51 轮最终回答与场景预期，对下述问题及核心政策事实核对证据。
 这是定性的开发检查，不是独立逐条裁定所有论述的完整评分。
 各报告的 `human_review` 均保留 null，没有补入虚构的人工判断。

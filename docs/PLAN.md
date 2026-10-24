@@ -1,15 +1,13 @@
 # Implementation plan and current scope
 
-[English](PLAN.md) | [简体中文](PLAN.zh-CN.md)
-
 ## Current architecture
 
 LangChain tools/providers, a bounded LangGraph controller, FastAPI and React/TypeScript.
 The agent browses the GitHub policy directory and reads selected files online.
 SQLite policy storage, FTS/vector search, document chunking, Embedding configuration
-and initialization commands were removed at the user's request on 2026-10-24.
+and initialization commands were removed in the 2026-10-24 online-reading revision.
 
-## Agreed decisions
+## Design decisions
 
 - Web access only. The current page holds temporary completed question/answer pairs.
 - Use the frontend's most recent 20 completed pairs, trimming oldest whole pairs
@@ -23,7 +21,7 @@ and initialization commands were removed at the user's request on 2026-10-24.
 - No saved chat history, embedding service, local policy library, automatic summaries,
   authentication, admin system or public deployment.
 
-## Validation and handoff
+## Validation and release
 
 Verify source access, bounded tools, citation ranges, context trimming/isolation,
 frontend behavior and clean setup. The 45-scenario / 51-turn suite has been rerun for this architecture, including
@@ -31,7 +29,7 @@ a complete initial run and a revised numbered-citation run; both reports are ret
 limitations in VERIFICATION.md and evaluation documentation. Independent human
 semantic review remains open; no scripted test or coverage number is an accuracy score.
 
-GitHub handoff includes the online-reading revision, 20-turn context change and
-redrawn numbered sequence diagram. Reviewers need private-repository access.
-Use the published commit history and Actions checks for delivery verification;
+The published revision includes online file reading, 20-turn context management
+and the numbered sequence diagram. Private-repository access is required.
+Use the published commit history and Actions checks for release verification;
 older CI results do not verify a newer source revision.

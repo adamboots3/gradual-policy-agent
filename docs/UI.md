@@ -1,7 +1,5 @@
 # Web interface — temporary conversations
 
-[English](UI.md) | [简体中文](UI.zh-CN.md)
-
 The React/TypeScript web client is the only conversation interface. It uses Vite's
 API proxy in development and Nginx in Compose. Only the backend reads model keys.
 The sidebar contains online policy-source information and a new-chat action; there is no
