@@ -1,5 +1,8 @@
 # Architecture and contracts
 
+Agent 内部的框架职责、State、检查点与重试机制见
+[Agent 内部机制图](AGENT_INTERNALS.md)。
+
 ## Online file-reading interaction / 在线读取时序图
 
 The page owns temporary completed turns. Each backend request creates a fresh

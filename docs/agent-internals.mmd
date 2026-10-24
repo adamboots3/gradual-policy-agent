@@ -1,0 +1,51 @@
+sequenceDiagram
+    autonumber
+    box rgb(219,234,254) 本轮 Agent 执行
+        participant G as LangGraph 执行器
+    end
+    participant C as LangChain 模型接口
+    participant L as LLM
+    participant T as LangChain 工具接口
+    box rgb(255,243,224) 项目自定义逻辑
+        participant H as 检查函数 / Hook
+    end
+
+    Note over C,T: 预先装配：初始化模型、@tool + Pydantic、bind_tools
+    G->>G: START：接收本轮 AgentState
+
+    loop 未接受答案，且模型调用次数未到上限
+        G->>G: decide：组装系统提示与当前消息
+        G->>H: Hook ①：ContextBudget.fit()
+        H-->>G: 检查容量，必要时裁掉最早的完整历史问答
+        G->>C: bound.invoke(messages, max_tokens)
+        C->>L: 发送消息与工具 Schema
+        L-->>C: AIMessage：工具名与参数
+        C-->>G: 返回 tool_calls 与用量信息
+        Note over G,C: 上下文超长异常在 decide 内裁旧历史并重试
+        G->>G: 保存 AIMessage 并计数<br/>进入 execute，检查工具预算
+
+        alt 读取目录或政策文件
+            G->>T: 对应工具.invoke(args)
+            T->>T: 校验参数，调用本轮 GitHub 读取器
+            T-->>G: 目录、带行号的原文或工具参数错误
+            G->>G: 写入 ToolMessage<br/>成功读取时更新 evidence
+        else 提交候选答案
+            G->>T: submit_answer.invoke(args)
+            T-->>G: 参数校验后的候选答案
+            G->>H: Hook ②：validate_answer(候选答案, evidence)
+            alt 引用校验通过
+                H-->>G: 可接受的答案、原文摘录与来源链接
+                G->>G: 保存 result<br/>写入成功 ToolMessage
+            else 引用校验未通过
+                H-->>G: 返回具体校验错误
+                G->>G: 写入错误 ToolMessage<br/>result 保持为空
+            end
+        else 没有调用任何工具
+            G->>G: 追加 HumanMessage<br/>提醒使用 submit_answer
+        end
+
+        G->>G: route 条件边<br/>有结果或到上限则收尾，否则回到 decide
+    end
+
+    G->>G: finalize：准备最终回复<br/>无已接受结果则说明证据不足
+    G->>G: END：返回最终结果
