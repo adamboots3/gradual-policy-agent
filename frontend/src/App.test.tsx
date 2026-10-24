@@ -29,7 +29,6 @@ const answer: Answer = {
       label: 1,
       source_id: "evidence",
       title: "Appeal and Reinstatement",
-      heading: "How this works",
       content: "Please fill out the appeal form. <script>unsafe()</script>",
       path: "Policies/appeal.md",
       start_line: 10,
@@ -154,6 +153,7 @@ describe("temporary Policy Desk", () => {
     expect(
       screen.getByRole("link", { name: /Open original on GitHub/ }),
     ).toHaveAttribute("href", answer.citations[0].source_url);
+    expect(screen.getByText("Policies/appeal.md")).toBeInTheDocument();
     vi.mocked(api.send).mockResolvedValue({ ...answer, run_id: "run-2" });
     await ask("What is the deadline?");
     await waitFor(() => expect(api.send).toHaveBeenCalledTimes(2));
@@ -180,6 +180,27 @@ describe("temporary Policy Desk", () => {
       expect.any(AbortSignal),
     );
     expect(save).not.toHaveBeenCalled();
+  });
+
+  it("clears a previous source when the next reply has no citations", async () => {
+    await ready();
+    await ask("Can I appeal?");
+    await screen.findByRole("link", { name: /Open original on GitHub/ });
+    vi.mocked(api.send).mockResolvedValue({
+      ...answer,
+      run_id: "greeting-2",
+      kind: "greeting",
+      answer: "Hello!",
+      citations: [],
+      source_commit: null,
+      read_calls: 0,
+    });
+    await ask("Hello");
+    await screen.findByText("Hello!");
+    expect(
+      screen.queryByRole("link", { name: /Open original on GitHub/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Follow the evidence")).toBeInTheDocument();
   });
 
   it("isolates two open windows", async () => {
@@ -288,7 +309,7 @@ describe("temporary Policy Desk", () => {
     await screen.findByText("You can submit an appeal.");
   });
 
-  it("shows a recoverable offline error without fabricated library data", async () => {
+  it("shows a recoverable offline error without fabricated source data", async () => {
     vi.mocked(api.health).mockRejectedValue(
       new ApiError("Cannot reach the server", 0),
     );

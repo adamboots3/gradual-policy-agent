@@ -2,7 +2,6 @@ export interface Citation {
   label: number;
   source_id: string;
   title: string;
-  heading: string;
   content: string;
   path: string;
   start_line: number;
@@ -66,7 +65,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         : `Request failed (${response.status}). Please retry.`;
     throw new ApiError(detail, response.status);
   }
-  return response.status === 204 ? (undefined as T) : response.json();
+  return response.json();
 }
 const json = (method: string, body?: unknown): RequestInit => ({
   method,

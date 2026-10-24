@@ -1,1 +1,1 @@
-"""Reproducible evaluation commands; keep retrieval and answer scores separate."""
+"""Online-agent evaluation; separate structural checks from semantic review."""

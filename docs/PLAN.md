@@ -1,35 +1,35 @@
-# Implementation plan and current scope
+# Project scope and design decisions
 
-## Current architecture
+## Runtime architecture
 
-LangChain tools/providers, a bounded LangGraph controller, FastAPI and React/TypeScript.
-The agent browses the GitHub policy directory and reads selected files online.
-SQLite policy storage, FTS/vector search, document chunking, Embedding configuration
-and initialization commands were removed in the 2026-10-24 online-reading revision.
+React/TypeScript provides the web interface; FastAPI hosts a request-scoped
+LangGraph agent. LangChain adapts the configured chat model and exposes three
+tools: list the GitHub policy directory, read selected original lines, and submit
+an answer with citations. The LLM chooses which files and ranges to read.
 
-## Design decisions
+## Context and source ownership
 
-- Web access only. The current page holds temporary completed question/answer pairs.
-- Use the frontend's most recent 20 completed pairs, trimming oldest whole pairs
-  only when context budgeting requires it; recheck before each model call.
-- Three tools: list directory, read selected original files/ranges, submit answer.
-- Let the LLM select files by directory/name and continue reading when needed.
-- Pin one immutable GitHub commit per question; keep bodies only in request memory.
-- Build exact original-line citations from ranges read in this question. Do not
-  treat earlier answers as policy evidence or provenance as semantic correctness.
-- Fail explicitly on source/network/rate-limit errors rather than inventing policy.
-- No saved chat history, embedding service, local policy library, automatic summaries,
-  authentication, admin system or public deployment.
+- The page retains completed turns in React memory. Refresh, page exit and New
+  conversation clear them; another tab starts independently.
+- The frontend sends at most 20 completed question/answer pairs. Before every
+  model call, the backend removes oldest whole pairs only when the input budget
+  requires it. The current question and current-turn tool messages remain intact.
+- Each question resolves one immutable policy commit. Directory/file caches and
+  evidence belong only to that request and are released afterwards.
+- Source links and exact excerpts are constructed by the server from lines read
+  in the current question. Earlier answers cannot authorize new citations.
+- Model, directory and read budgets bound the agent loop. Source failures produce
+  explicit errors; unsupported submissions receive tool feedback for correction.
 
-## Validation and release
+## Validation and limits
 
-Verify source access, bounded tools, citation ranges, context trimming/isolation,
-frontend behavior and clean setup. The 45-scenario / 51-turn suite has been rerun for this architecture, including
-a complete initial run and a revised numbered-citation run; both reports are retained. Record actual results and
-limitations in VERIFICATION.md and evaluation documentation. Independent human
-semantic review remains open; no scripted test or coverage number is an accuracy score.
+Deterministic tests cover the real graph, mocked source access, context boundaries,
+citation validation, request isolation and web interaction. The live evaluation
+uses 45 scenarios / 51 turns with fixed source anchors. See
+[verification](VERIFICATION.md), [evaluation](../evals/README.md) and
+[recorded results](ONLINE_RESULTS.md).
 
-The published revision includes online file reading, 20-turn context management
-and the numbered sequence diagram. Private-repository access is required.
-Use the published commit history and Actions checks for release verification;
-older CI results do not verify a newer source revision.
+Citation provenance does not prove semantic support. Independent semantic review
+is still incomplete, and known file-selection/interpretation failures remain
+documented. Authentication, public hosting, automatic summaries, persisted chats
+and local policy indexing are outside the current scope.

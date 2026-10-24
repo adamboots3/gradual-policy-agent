@@ -49,7 +49,7 @@ class EvalCase(BaseModel):
 
 class Dataset(BaseModel):
     version: int
-    corpus_commit: str
+    corpus_commit: str = Field(pattern=r"^[0-9a-f]{40}$")
     references: dict[str, Reference]
     cases: list[EvalCase] = Field(min_length=1)
 
@@ -230,13 +230,13 @@ def main():
     mode.add_argument(
         "--validate",
         action="store_true",
-        help="Validate cases and source anchors without API calls (default)",
+        help="Read GitHub to validate cases and source anchors; no model calls (default)",
     )
     mode.add_argument(
         "--live", action="store_true", help="Run real model requests; incurs provider charges"
     )
     parser.add_argument("--dataset", type=Path, default=Path("evals/datasets/answers.yaml"))
-    parser.add_argument("--output", type=Path, default=Path("evals/reports/answers-live.json"))
+    parser.add_argument("--output", type=Path, default=Path("evals/reports/answers-local.json"))
     parser.add_argument("--limit", type=int)
     parser.add_argument("--workers", type=int, default=1, choices=range(1, 5))
     args = parser.parse_args()

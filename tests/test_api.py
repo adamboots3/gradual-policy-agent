@@ -11,7 +11,8 @@ def test_health_and_source_configuration_need_no_github_or_model_calls(corpus):
     settings = Settings()
     service = ChatService(settings, lambda _: None, corpus.factory)
     with TestClient(create_app(settings, service)) as client:
-        assert client.get("/api/health").json()["source_mode"] == "github-online"
+        health = client.get("/api/health").json()
+        assert health["source_mode"] == "github-online" and "stage" not in health
         assert client.get("/api/policies").json() == {
             "repository": "https://github.com/github/site-policy",
             "ref": "HEAD",

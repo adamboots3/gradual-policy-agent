@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-// Avoid platform shell shims: the assignment directory contains spaces and '&'.
+// Invoke Node directly so builds work in paths containing spaces and shell metacharacters.
 for (const args of [
   ["node_modules/typescript/bin/tsc", "--noEmit"],
   ["node_modules/vite/bin/vite.js", "build"],

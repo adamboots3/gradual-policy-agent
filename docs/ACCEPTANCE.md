@@ -1,22 +1,23 @@
-# Acceptance audit — online-reading revision, 2026-10-24
+# Current capability and validation status
 
-The project provides web-only temporary conversations and an agent that chooses
-and reads policy files directly from GitHub. The local
-policy library, embeddings, ingestion/indexing and interactive CLI are removed.
+The application is a web-only GitHub policy assistant. It reads original policy
+files online through a bounded LangChain/LangGraph agent and keeps conversation
+history only in the current browser page.
 
-| Capability | Current implementation | Boundary |
+| Capability | Implementation | Validation and limits |
 | --- | --- | --- |
-| Policy-grounded support | List directory, let the LLM choose/read files, answer from current-turn text | File-selection misses and semantic overstatements remain possible |
-| Multi-turn | At most 20 frontend-owned completed pairs; oldest-first context trimming | No summaries or history restoration |
-| Source citations | Actual-read IDs, exact selected original lines, immutable commit URLs | Provenance does not prove claim support |
-| Agent framework | LangChain tools/model adapters and bounded LangGraph execution | No arbitrary browsing or production authentication |
-| Web access | React chat, inline citations, source panel and online-source information | Model/GitHub access is required for policy answers |
-| Environment | Locked Python/npm dependencies, native and Compose startup, no policy initialization | Latest executed checks are in VERIFICATION.md; historical remote CI is not a new run |
-| Evaluation | Two complete online runs; final 51/51 completed, 50/51 expected kinds, 51/51 provenance | File-selection/semantic issues are documented; independent human review remains open |
-| Repository | Private repository on `main`, with online-reading source, reports and sequence diagram | Repository access is required; check Actions for the published revision |
+| Policy source | Directory-guided selection and original-line reads from `github/site-policy` | One immutable commit per request; exact blob checks; source failures abort |
+| Multi-turn context | Frontend sends up to 20 completed pairs | Rechecked before every model call; oldest whole pairs trimmed; no summaries |
+| Temporary state | Fresh graph, evidence and reader per request | Window/request isolation, no chat storage, no old tool traces imported |
+| Citations | Server extracts selected original lines and builds commit/line URLs | Format, current reads and ranges validated; semantic support still needs review |
+| Agent control | Three tools, three graph nodes, conditional routing | Default six read attempts, two directory requests, ten successful model responses |
+| Web UI | Questions, follow-ups, citations, reset and recoverable errors | 14 frontend tests; real Chinese follow-up/source/reset checks; no CLI chat |
+| API | Health, source configuration and stateless chat | 79 backend tests; unknown fields rejected; sanitized source/model failures |
+| Evaluation | Fixed 45-scenario / 51-turn / 36-anchor dataset | Online recorded run retained unchanged; independent semantic review incomplete |
+| Reproducibility | Locked Python/npm dependencies, native and Compose startup | Windows/Linux and container checks are automated in GitHub Actions |
 
-Repository: [adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent).
-The previous web-only commit `4bc4639` passed all five GitHub Actions jobs.
-The online-reading change is recorded separately; old reports remain historical.
-No public deployment is configured. Credentials stay local and are never included
-in versioned reports.
+Current execution evidence is in [VERIFICATION](VERIFICATION.md). The
+[recorded evaluation](ONLINE_RESULTS.md) includes file-selection and interpretation
+failures; source provenance is not answer accuracy. The app has no authentication
+or public hosting configuration. Repository access is required for the private
+[source repository](https://github.com/adamboots3/gradual-policy-agent).

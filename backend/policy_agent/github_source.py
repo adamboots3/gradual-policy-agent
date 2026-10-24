@@ -63,7 +63,10 @@ class PolicyRepository:
                     body.extend(part)
                     if len(body) > limit:
                         raise PolicySourceError("GitHub policy response exceeds the allowed size.")
-                return json.loads(body)
+                value = json.loads(body)
+                if not isinstance(value, dict):
+                    raise PolicySourceError("GitHub returned invalid policy response metadata.")
+                return value
         except (httpx.HTTPError, ValueError) as exc:
             raise PolicySourceError(
                 "Cannot read GitHub policies. Check network access and retry."
@@ -72,28 +75,39 @@ class PolicyRepository:
     def list_documents(self):
         if self.documents is None:
             value = self._get("/commits/" + quote(self.settings.github_ref, safe=""))
-            commit = value.get("sha", "")
-            tree = value.get("commit", {}).get("tree", {}).get("sha", "")
-            if not SHA.fullmatch(commit) or not SHA.fullmatch(tree):
+            commit = value.get("sha")
+            metadata = value.get("commit")
+            tree_metadata = metadata.get("tree") if isinstance(metadata, dict) else None
+            tree = tree_metadata.get("sha") if isinstance(tree_metadata, dict) else None
+            if not all(isinstance(sha, str) and SHA.fullmatch(sha) for sha in (commit, tree)):
                 raise PolicySourceError("GitHub returned invalid policy snapshot metadata.")
             result = self._get(f"/git/trees/{tree}", params={"recursive": "1"}, limit=8_000_000)
             if result.get("truncated"):
                 raise PolicySourceError(
                     "GitHub returned an incomplete policy directory; retry later."
                 )
+            entries = result.get("tree")
+            if not isinstance(entries, list):
+                raise PolicySourceError("GitHub returned invalid policy directory metadata.")
             documents = {}
-            for entry in result.get("tree", []):
+            for entry in entries:
+                if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
+                    raise PolicySourceError("GitHub returned invalid policy directory metadata.")
                 path = entry.get("path", "")
                 if (
                     path.startswith("Policies/")
                     and path.endswith(".md")
                     and entry.get("type") == "blob"
                     and entry.get("mode") in ("100644", "100755")
-                    and SHA.fullmatch(entry.get("sha", ""))
+                    and isinstance(entry.get("sha"), str)
+                    and SHA.fullmatch(entry["sha"])
                 ):
+                    size = entry.get("size")
+                    if type(size) is not int or size < 0:
+                        raise PolicySourceError("GitHub returned invalid policy file metadata.")
                     documents[path] = {
                         "path": path,
-                        "bytes": entry.get("size", 0),
+                        "bytes": size,
                         "sha": entry["sha"],
                     }
             if not documents or len(documents) > 1000:
@@ -124,7 +138,7 @@ class PolicyRepository:
                 raise PolicyToolError("This policy file exceeds the 512 KB reading limit.")
             blob = self._get(f"/git/blobs/{entry['sha']}")
             try:
-                if blob.get("encoding") != "base64":
+                if blob.get("encoding") != "base64" or not isinstance(blob.get("content"), str):
                     raise PolicyToolError("Unsupported blob encoding")
                 raw = base64.b64decode("".join(blob["content"].split()), validate=True)
                 digest = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
@@ -187,7 +201,6 @@ def citation_from_read(record: dict, start: int, end: int):
     return {
         "source_id": record["source_id"],
         "title": record["title"],
-        "heading": "",
         "content": content,
         "path": record["path"],
         "start_line": start,

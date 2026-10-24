@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from policy_agent.chat import ChatService, HistoryTurn
 from policy_agent.config import Settings
@@ -12,6 +12,8 @@ from policy_agent.providers import ConfigurationError
 
 
 class MessageRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     content: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
     history: list[HistoryTurn] = Field(default_factory=list, max_length=20)
 
@@ -40,7 +42,6 @@ def create_app(settings: Settings | None = None, service=None) -> FastAPI:
     def health():
         return {
             "status": "ok",
-            "stage": "agent-backend",
             "source_mode": "github-online",
             "chat_configured": bool(settings.chat_provider and settings.chat_model),
             "conversation_mode": "window-memory",

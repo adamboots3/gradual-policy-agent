@@ -1,4 +1,4 @@
-# Agent 内部机制：LangChain、LangGraph 与检查点
+# Agent 内部机制：LangChain、LangGraph 与校验钩子
 
 本图对应当前 `policy-agent-online-v2` 实现，参与者表示代码职责，不是独立部署的服务。
 LangGraph 执行器一列包含我们定义的节点函数和条件路由。
@@ -106,7 +106,7 @@ START → decide → execute → route 条件边
 完整问答，不导入上一轮的工具执行记录和证据。State 和文件缓存不跨请求保留。
 普通聊天不返回或保存 trace；显式评测可以取出 trace 并写入合成测试报告。
 
-## 两处 Hook 式检查点
+## 两处 Hook 式检查
 
 | 检查点 | 实际位置 | 检查内容 | 未通过时 |
 | --- | --- | --- | --- |

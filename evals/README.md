@@ -2,81 +2,71 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-## Deterministic checks
+## Deterministic tests
 
 ```sh
 uv run pytest
 ```
 
-Tests use mocked GitHub APIs and scripted model responses. They require no network,
-model key, local corpus, index or Embedding service.
+Tests execute the graph and source reader with scripted models and mocked GitHub
+responses. They require no network or model keys and do not measure model quality.
 
-## Validate the source-anchored dataset
+## Validate the dataset against GitHub
 
 ```sh
 uv run python -m evals.answers --validate
 ```
 
-This makes GitHub read requests but no model calls. It validates the schema, unique
-case/reference IDs, the immutable policy commit and exact reference excerpts from
-GitHub. No local policy checkout or database is used. Optional `POLICY_GITHUB_TOKEN`
-provides higher read API limits. The suite contains 45 scenarios / 51 user turns,
-including six multi-turn scenarios, cross-document questions, false premises,
-missing evidence, out-of-scope requests, injection and Chinese questions.
+This reads GitHub but makes no model calls. It validates the schema, unique case
+IDs, reference IDs, immutable policy commit and exact original excerpts.
+`corpus_commit` in the dataset names the remote policy snapshot, not a local
+database. The fixed set contains 45 scenarios / 51 turns / 36 source anchors,
+including six multi-turn scenarios, factual/cross-document questions, false
+premises, insufficient evidence, out-of-scope requests, injection and Chinese.
+An optional read-only `POLICY_GITHUB_TOKEN` raises the public REST API quota.
 
-## Live online-agent evaluation
+## Live evaluation
 
 ```sh
-uv run python -m evals.answers --live --limit 3 --output evals/reports/online-smoke.json
-uv run python -m evals.answers --live --workers 3 --output evals/reports/answers-online.json
+uv run python -m evals.answers --live --limit 3 --output evals/reports/answers-smoke.json
+uv run python -m evals.answers --live --workers 3 --output evals/reports/answers-local.json
 ```
 
-Requires a configured tool-capable chat model and incurs model API costs. The
-runner fixes `POLICY_GITHUB_REF` to the dataset commit for comparison. It uses the
-same online ChatService: each question starts a new reader and the LLM chooses
-files using the directory, then reads them through tools. Earlier answers provide
-only temporary scenario context, capped at 20 pairs. Context resets per scenario.
-Optional `--workers 1..4` runs isolated scenarios
-concurrently (default 1); output ordering stays fixed. Latency from different worker
-counts is not a direct performance comparison.
-A failed setup turn stops dependent follow-ups.
+A configured tool-capable chat model is required; live calls incur provider costs.
+The default output is `evals/reports/answers-local.json`, which is Git-ignored and
+does not overwrite the committed baseline. `--workers 1..4` runs isolated scenarios
+(default 1); result ordering remains fixed. Different concurrency levels do not
+provide a controlled latency comparison.
 
-Gold reference texts are downloaded into evaluator memory solely for validation;
-they are never given to the agent. Alternative cited files are independently read
-from the same snapshot for checking. No policy bodies or embeddings are persisted
-as application data. Only explicit synthetic evaluation reports are written.
-Reports record the policy commit, prompt/model, read traces, exact citations, usage,
-latency and errors, without keys or endpoint credentials. Generated reports are
-ignored until reviewed and explicitly selected for version control.
+The runner pins the dataset's policy commit and calls the same `ChatService` as
+the API. Each question creates a fresh reader; the LLM chooses and opens files.
+Only completed question/answer pairs pass to later turns of the same scenario,
+capped at 20. Context resets between scenarios. A failed setup turn stops dependent
+follow-ups. Reference text stays in evaluator memory and is never supplied to the
+agent; alternative cited files are independently fetched for checking.
 
-Automatic checks measure expected-kind agreement, exact original-text provenance,
-current-turn read provenance, citation presence, source version and expected anchor
-coverage. **These are not answer accuracy or proof of semantic grounding.** A
-correct alternative source can have low expected-anchor coverage; a perfectly
-formatted citation can support an incorrect interpretation.
+Reports contain questions, responses, exact citations, traces, version/model/prompt
+metadata, usage, latency and error types. They contain no credentials. Only explicit
+synthetic evaluation reports are written; application chat and source caches remain
+temporary. Generated reports stay ignored until deliberately selected for version control.
 
-## Semantic review
+## Metrics and semantic review
 
-For each completed turn, review `correctness`, `grounding`, `citation_support` and
-`notes`. Correctness asks whether the answer addresses the exact question, preserves
-exceptions and handles follow-ups. Grounding asks whether every material policy
-claim follows from read text. Citation support asks whether the selected lines
-actually substantiate each associated claim. For non-policy replies, grounding and
-support may be not applicable; correctness still assesses whether refusal/greeting
-was appropriate. Keep unreviewed fields null. Coding-agent review is identified
-separately from independent human review.
+Automatic checks measure expected-kind agreement, exact citation provenance,
+current-turn reads, citation presence, source version and expected file/anchor
+coverage. **They are not answer accuracy or proof of semantic support.** Non-policy
+answers can pass citation checks without reads; valid alternative evidence can
+have low expected-source coverage.
 
-The case set is public development data, not a held-out benchmark. Changes to
-prompts, file-reading behavior, model or source require a new run. Prior keyword /
-hybrid reports, retrieval datasets and [historical analysis](../docs/RESULTS.md)
-remain evidence about the removed architecture; the retrieval runner and embedding
-setup no longer exist. Their scores must not be presented as online-agent scores.
+Review `human_review.correctness`, `grounding`, `citation_support` and `notes` for
+each turn. Check the exact question, follow-up interpretation, exceptions and
+whether every material claim follows from its cited lines. For non-policy replies,
+grounding/support may be inapplicable, but response appropriateness still matters.
+Leave unreviewed fields null; distinguish coding-agent observations from independent
+human assessment. No model-judge prompt is implemented.
 
-
-## Current recorded online results
-
-The revised numbered-citation agent completed all 51 turns without request errors.
-Expected-kind agreement was 50/51; provenance/citation-presence/source-version checks
-passed 51/51. Expected-document coverage was 94.4%, anchor coverage 92.2%.
-These are not semantic accuracy scores. Initial failures and final limitations are
-preserved in [online results](../docs/ONLINE_RESULTS.md) and both raw online reports.
+The dataset is public development data. Prompt, model or source-reading changes
+require a new live run before claiming a new quality score. The unchanged
+[recorded report](reports/answers-online.json) and its known failures are described
+in [ONLINE_RESULTS](../docs/ONLINE_RESULTS.md); current engineering checks are in
+[VERIFICATION](../docs/VERIFICATION.md).

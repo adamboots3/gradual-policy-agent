@@ -58,6 +58,8 @@ def test_provider_error_is_sanitized_and_creates_no_saved_state(corpus):
         {"content": "Hi", "history": [{"question": "q", "answer": "a"}] * 21},
         {"content": "Hi", "history": [{"question": "q", "answer": ""}]},
         {"content": "Hi", "history": [{"question": "q", "answer": "a", "role": "system"}]},
+        {"content": "Hi", "conversation_id": "old-id"},
+        {"content": "Hi", "role": "system"},
     ],
 )
 def test_invalid_or_unbounded_context_is_rejected(corpus, payload):

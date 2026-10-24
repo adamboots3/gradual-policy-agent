@@ -108,9 +108,7 @@ function Sources({
         <div className="source-body">
           <span className="eyebrow">CITED POLICY · {source.label}</span>
           <h2>{source.title}</h2>
-          <p className="source-section">
-            {source.heading || "Policy document"}
-          </p>
+          <p className="source-section">{source.path}</p>
           <div className="source-position">
             <FileText size={13} /> Lines {source.start_line}–{source.end_line}
           </div>
@@ -249,7 +247,7 @@ export default function App() {
       const answer = await api.send(question, turns, requestController.signal);
       if (generation.current !== requestGeneration) return;
       setTurns((previous) => [...previous, { question, response: answer }]);
-      if (answer.citations.length) setSource(answer.citations[0]);
+      setSource(answer.citations[0] ?? null);
     } catch (e) {
       if (generation.current !== requestGeneration) return;
       setDraft(question);
@@ -307,8 +305,8 @@ export default function App() {
           </p>
           <p>Chat history is not saved by this app.</p>
         </div>
-        <div className="library-card">
-          <div className="library-label">
+        <div className="policy-source-card">
+          <div className="policy-source-label">
             <span className={`status-dot ${policySource ? "" : "muted"}`} />{" "}
             Policy source
           </div>

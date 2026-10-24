@@ -7,17 +7,9 @@ __pycache__/
 .env.*
 !.env.example
 data/
-!data/.gitkeep
 node_modules/
 frontend/dist/
 evals/reports/*.json
-!evals/reports/retrieval-baseline.json
-!evals/reports/retrieval-keyword-extended.json
-!evals/reports/retrieval-hybrid.json
-!evals/reports/answers-live-initial.json
-!evals/reports/answers-keyword-v2.json
-!evals/reports/answers-hybrid-final.json
 *.egg-info/
 
-!evals/reports/answers-online-initial.json
 !evals/reports/answers-online.json

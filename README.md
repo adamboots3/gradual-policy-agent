@@ -120,8 +120,7 @@ actual capacity explicitly. Output is capped at `POLICY_CHAT_MAX_OUTPUT_TOKENS`
 (default 2,048), with `POLICY_CHAT_CONTEXT_MARGIN_TOKENS` (default 512) reserved.
 Token counts are conservative local estimates, not an exact vendor tokenizer.
 If mandatory current-turn material alone cannot fit, the API returns a clear 422.
-Trimming affects LLM input, not the page's displayed history. Old
-`POLICY_HISTORY_TURNS`, retrieval and embedding settings have no effect.
+Trimming affects LLM input, not the page's displayed history.
 
 | Endpoint | Contract |
 | --- | --- |
@@ -133,8 +132,8 @@ Responses include `source_commit`, `read_calls`, model/prompt metadata, latency 
 received/used/trimmed history counts. Greetings can have a null source commit when
 no policy was read. Chat responses use `Cache-Control: no-store`. Source/configuration
 failures return 503, context/schema failures 422, other provider failures a sanitized
-502. Former `/api/knowledge` and `/api/conversations` routes are removed. No
-authentication or public application deployment is included.
+502. Unknown request fields are rejected. No authentication or public application
+deployment is included.
 
 ## Verify and evaluate
 
@@ -153,7 +152,8 @@ source anchors. Live evaluation uses the same online agent and incurs model cost
 The [final online run](docs/ONLINE_RESULTS.md) completed 51/51 turns with no request
 errors, 50/51 expected-kind agreement and 51/51 provenance checks. These are not
 semantic accuracy scores; file-selection and interpretation failures remain.
-Previous hybrid/keyword reports are historical, not scores for this architecture.
+New live runs write a separate ignored report; the recorded report is not overwritten
+by default. See [verification](docs/VERIFICATION.md) for current engineering checks.
 
 ## Containers
 

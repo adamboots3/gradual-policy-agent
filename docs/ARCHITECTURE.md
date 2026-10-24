@@ -1,6 +1,6 @@
 # Architecture and contracts
 
-Agent 内部的框架职责、State、检查点与重试机制见
+Agent 内部的框架职责、State、检查函数与重试机制见
 [Agent 内部机制图](AGENT_INTERNALS.md)。
 
 ## Online file-reading interaction / 在线读取时序图
@@ -132,12 +132,11 @@ conversations, cookies, local/session storage writes or cross-request agent trac
 fixed repository and selected ref, without listing/fetching files. `POST /api/chat`
 accepts `{content, history:[{question,answer}]}`. History fields are bounded and
 cannot inject role/tool fields. Chat responses, including errors, use no-store.
-The former knowledge-search, conversation CRUD and CLI/setup flows are removed.
 
 Explicit evaluations hold expected original documents in evaluator memory and
 write synthetic reports deliberately. The agent receives neither gold reference
 text nor expected paths, and still selects/reads files online in each turn. Source
 verification checks original lines and actual-read traces independently, including
 alternative cited files outside the gold reference set. Evaluation reports distinguish
-structural provenance/coverage from semantic correctness. Historical mixed-retrieval
-reports are preserved, with their original failures.
+structural provenance/coverage from semantic correctness. The recorded online report
+is retained unchanged; new runs use a separate output file by default.

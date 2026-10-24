@@ -58,10 +58,10 @@ def test_profile_fallback_and_explicit_window():
         ContextBudget.for_model(settings, model)
 
 
-def test_budget_is_rechecked_after_retrieval_without_breaking_tool_pairs(corpus):
+def test_budget_is_rechecked_after_file_read_without_breaking_tool_pairs(corpus):
     history = [HistoryTurn(question=f"Q{i}:" + "q" * 200, answer="a" * 200) for i in range(20)]
     settings = Settings()
-    corpus.files["Policies/appeals.md"] = "Retrieved evidence " * 10 + "\n"
+    corpus.files["Policies/appeals.md"] = "Policy evidence " * 10 + "\n"
     corpus.files["Policies/appeals.md"] *= 80
     probe = ScriptedModel(
         call("list_policy_documents"),

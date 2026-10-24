@@ -300,8 +300,8 @@ def build_agent(model, repository, settings: Settings):
             "read_calls": state["read_calls"],
         }
         if result["kind"] == "insufficient_evidence":
-            # A refusal must not smuggle uncited policy assertions or claim that
-            # absence from retrieved fragments establishes absence from the corpus.
+            # A refusal must not smuggle uncited policy assertions or treat unread
+            # policy text as proof that no such rule exists.
             chinese = bool(re.search(r"[\u4e00-\u9fff]", state.get("question", "")))
             result = {
                 **result,

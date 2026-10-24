@@ -160,3 +160,42 @@ def test_long_document_returns_bounded_ranges_and_continuation(corpus):
             citation_from_read(first, first["start_line"], second["end_line"])
         with pytest.raises(ValueError, match="exceeds"):
             source.read_document("Policies/long.md", 10000)
+
+
+@pytest.mark.parametrize(
+    ("route", "payload"),
+    [
+        ("/commits/", []),
+        ("/commits/", {"sha": "a" * 40, "commit": None}),
+        ("/commits/", {"sha": [], "commit": {"tree": {"sha": "b" * 40}}}),
+        ("/trees/", {"tree": {}}),
+        ("/trees/", {"tree": [None]}),
+        (
+            "/trees/",
+            {
+                "tree": [
+                    {
+                        "path": "Policies/appeals.md",
+                        "mode": "100644",
+                        "type": "blob",
+                        "sha": "c" * 40,
+                        "size": None,
+                    }
+                ]
+            },
+        ),
+        ("/blobs/", []),
+        ("/blobs/", {"encoding": "base64", "content": []}),
+    ],
+)
+def test_malformed_upstream_metadata_is_a_sanitized_source_error(corpus, route, payload):
+    base = corpus.respond
+
+    def respond(request):
+        return httpx.Response(200, json=payload) if route in request.url.path else base(request)
+
+    with PolicyRepository(Settings(), transport=httpx.MockTransport(respond)) as source:
+        with pytest.raises(PolicySourceError):
+            source.list_documents()
+            source.read_document("Policies/appeals.md")
+        assert not source.files
