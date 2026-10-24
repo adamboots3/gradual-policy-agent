@@ -25,6 +25,9 @@
 > - [系统时序图](docs/ARCHITECTURE.md)：查看问题如何经过 Web、Agent、LLM 和 GitHub 读取工具完成一次问答。
 > - [Agent 结构与执行机制](docs/AGENT_INTERNALS.md)：了解 LangChain／LangGraph、状态、工具调用、校验 Hook 和路由如何协作。
 
+**中文演示视频（约 63 秒）：** [打开／下载完整操作演示（MP4）](https://github.com/adamboots3/gradual-policy-agent/releases/download/demo-video/policy-agent-demo.mp4)。
+展示政策问答、来源引用、跳转 GitHub 原文核对和连续追问，视频内含可开关的中文字幕轨道。
+
 ## 本地运行
 
 环境要求：Python 3.12、[uv](https://docs.astral.sh/uv/getting-started/installation/)、
