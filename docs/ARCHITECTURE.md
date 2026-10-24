@@ -1,6 +1,6 @@
 # Architecture and contracts
 
-## Online file-reading interaction
+## Online file-reading interaction / 在线读取时序图
 
 The page owns temporary completed turns. Each backend request creates a fresh
 LangGraph invocation and a GitHub reader; no local policy library, embeddings,
@@ -9,47 +9,46 @@ conversation store or persistent graph checkpointer is involved.
 ```mermaid
 sequenceDiagram
     autonumber
-    box rgb(219,234,254) Starting point
-        participant U as User
+    box rgb(219,234,254) 起点
+        participant U as 用户
     end
-    participant W as Current chat window
-    participant B as FastAPI
-    box Agent execution
-        participant A as LangGraph controller
-        participant L as Configurable LLM
-        participant T as Policy reading tools
+    participant W as Web 前端
+    participant A as Agent（LangGraph）
+    participant L as LLM（可配置）
+    participant T as GitHub 读取工具
+    participant G as GitHub 政策仓库
+
+    U->>W: 提出政策问题
+    W->>A: 问题 + 最近最多 20 轮问答
+    A->>L: 问题、历史与工具定义
+
+    L-->>A: 请求查看政策目录
+    A->>T: list_policy_documents()
+    T->>G: 确定本轮 commit，读取文件树
+    G-->>T: commit、目录结构与文件名
+    T-->>A: 政策目录
+    A->>L: 提供目录，交由模型选文件
+
+    loop 按需阅读文件或后续行
+        L-->>A: 选择文件和行范围
+        A->>T: read_policy_document()
+        T->>G: 未缓存时读取该版本的文件
+        G-->>T: 原始文件正文
+        T-->>A: 带行号的原文 + 来源 ID
+        A->>L: 提供原文，判断是否需要继续阅读
     end
-    participant G as GitHub site-policy
-    U->>W: Ask or follow up
-    W->>B: Question and up to 20 completed pairs
-    B->>A: Start request-scoped agent
-    A->>L: Question, context and tool descriptions
-    L-->>A: Request policy directory
-    A->>T: list_policy_documents
-    T->>G: Resolve commit and read file tree
-    G-->>T: Commit, paths and sizes
-    T-->>A: Policy directory
-    A->>L: Supply directory
-    L-->>A: Choose policy file and line range
-    A->>T: read_policy_document
-    T->>G: Read blob from the pinned tree
-    G-->>T: Original file bytes
-    T-->>A: Numbered lines and source ID
-    A->>L: Supply original policy lines
-    opt More information needed
-        L-->>A: Choose another file or continuation
-        A->>T: read_policy_document
-        T->>G: Read selected file if not already in request memory
-        G-->>T: Original file bytes
-        T-->>A: Additional numbered lines
-        A->>L: Supply additional policy text
-    end
-    L-->>A: Submit answer and exact cited line ranges
-    A->>A: Check read ranges, extract originals and build links
-    A-->>B: Answer and source excerpts
-    B-->>W: Response
-    W-->>U: Display answer and citations
+
+    L-->>A: submit_answer：答案 + 编号引用与行范围
+    A->>A: 核对已读行，提取原文并生成来源链接
+    A-->>W: 答案 + 原文引用
+    W-->>U: 展示回答与可查看的来源
 ```
+
+This diagram follows one policy question; FastAPI routes the frontend request into
+the request-scoped LangGraph agent. The repeated read cycle is schematic: a file
+already opened in this request is served from memory without another GitHub request.
+Before every LLM call, the agent budgets all input/output reserves and removes
+oldest completed historical pairs if needed.
 
 The LLM selects documents by path/name; no keyword/vector ranking or ingestion
 chunking occurs. The same read tool continues long files by line range. The

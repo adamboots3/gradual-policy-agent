@@ -311,3 +311,19 @@ Runtime code imports neither the former policy database nor embedding/index modu
 former knowledge-search/setup routes and commands are gone. Historical answer and
 retrieval reports remain labeled as such. No public deployment, model key publication
 or GitHub push was performed for this revision.
+
+
+## GitHub handoff and redrawn sequence diagram — 2026-10-24
+
+The numbered sequence diagram now follows the online directory/file-reading flow,
+with a colored user starting lane, separate LLM/tool/repository participants and
+an explicit repeatable file-reading cycle. It omits policy-index/embedding modules
+and chat-window lifecycle callouts. Source is `docs/sequence.mmd`; the same diagram
+renders in ARCHITECTURE.md. The diagram is schematic about per-request file caching;
+context budgeting is documented immediately below it.
+
+The user authorized publishing both outstanding implementation commits (`33ecf38`
+and `a067af1`) together with this documentation update to the existing private
+repository's `main` branch. Original local checks and historical reports remain
+unchanged. Published commit/check status is available in the repository's
+[Actions history](https://github.com/adamboots3/gradual-policy-agent/actions/workflows/ci.yml).

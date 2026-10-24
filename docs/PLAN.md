@@ -29,6 +29,7 @@ a complete initial run and a revised numbered-citation run; both reports are ret
 limitations in VERIFICATION.md and evaluation documentation. Independent human
 semantic review remains open; no scripted test or coverage number is an accuracy score.
 
-The prior web-only revision was delivered to the private repository. This online
-reading revision is local until explicitly pushed; GitHub CI results for older
-commits do not verify the new source.
+GitHub handoff includes the online-reading revision, 20-turn context change and
+redrawn numbered sequence diagram. Reviewers need private-repository access.
+Use the published commit history and Actions checks for delivery verification;
+older CI results do not verify a newer source revision.
