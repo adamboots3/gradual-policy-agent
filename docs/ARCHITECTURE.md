@@ -13,13 +13,13 @@ sequenceDiagram
         participant U as 用户
     end
     participant W as Web 前端
-    participant A as Agent（LangGraph）
-    participant L as LLM（可配置）
+    participant A as Agent
+    participant L as LLM
     participant T as GitHub 读取工具
     participant G as GitHub 政策仓库
 
     U->>W: 提出政策问题
-    W->>A: 问题 + 最近最多 20 轮问答
+    W->>A: 问题 + 历史对话
     A->>L: 问题、历史与工具定义
 
     L-->>A: 请求查看政策目录
