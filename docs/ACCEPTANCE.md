@@ -1,5 +1,7 @@
 # Acceptance audit — online-reading revision, 2026-10-24
 
+[English](ACCEPTANCE.md) | [简体中文](ACCEPTANCE.zh-CN.md)
+
 Current design follows the user's revised scope: web-only temporary conversations
 and an agent that chooses and reads policy files directly from GitHub. The local
 policy library, embeddings, ingestion/indexing and interactive CLI are removed.

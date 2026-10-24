@@ -8,9 +8,10 @@
 无需本地政策数据库、关键词或向量索引、Embedding 服务、文档入库或预先切分的片段。
 
 项目仓库：[adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent)
-（私有仓库，评审需要访问权限）。相关文档：[架构与时序图](docs/ARCHITECTURE.md)、
-[Agent 内部机制](docs/AGENT_INTERNALS.md)、[验证记录](docs/VERIFICATION.md)、
-[当前评测结果](docs/ONLINE_RESULTS.md)、[评测说明](evals/README.zh-CN.md)。
+（私有仓库，评审需要访问权限）。[中文文档目录](docs/README.zh-CN.md)包含全部说明。
+相关文档：[架构与时序图](docs/ARCHITECTURE.zh-CN.md)、
+[Agent 内部机制](docs/AGENT_INTERNALS.md)、[验证记录](docs/VERIFICATION.zh-CN.md)、
+[当前评测结果](docs/ONLINE_RESULTS.zh-CN.md)、[评测说明](evals/README.zh-CN.md)。
 
 ## 本地运行
 
@@ -145,7 +146,7 @@ uv run python -m evals.answers --validate
 在 `frontend/` 目录运行：`npm test`、`npm run format:check`、`npm run build`。
 [评测套件](evals/README.zh-CN.md) 包含 45 个场景、51 轮问题和精确的来源锚点。
 真实评测调用同一套在线 Agent，会产生模型费用。
-[最终在线评测](docs/ONLINE_RESULTS.md) 完成 51/51 轮、无请求错误，
+[最终在线评测](docs/ONLINE_RESULTS.zh-CN.md) 完成 51/51 轮、无请求错误，
 50/51 轮回答类型符合预期，51/51 轮来源检查通过。
 这些指标不是语义准确率；文件选择和原文解释仍有已知问题。
 旧版混合／关键词检索报告仅供历史参考，不代表当前架构的效果。

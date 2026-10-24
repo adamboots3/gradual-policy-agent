@@ -13,6 +13,8 @@ Repository: [adamboots3/gradual-policy-agent](https://github.com/adamboots3/grad
 [Agent internals](docs/AGENT_INTERNALS.md), [verification](docs/VERIFICATION.md), [current results](docs/ONLINE_RESULTS.md),
 [evaluation](evals/README.md).
 
+[中文文档目录](docs/README.zh-CN.md) provides Chinese versions of the project documentation.
+
 ## Run locally
 
 Requirements: Python 3.12, [uv](https://docs.astral.sh/uv/getting-started/installation/),

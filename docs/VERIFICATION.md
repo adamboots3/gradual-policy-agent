@@ -1,5 +1,7 @@
 # Verification record
 
+[English](VERIFICATION.md) | [简体中文](VERIFICATION.zh-CN.md)
+
 This is a chronological development log. Earlier pending statuses are superseded by
 the final acceptance entry below and `RESULTS.md`.
 

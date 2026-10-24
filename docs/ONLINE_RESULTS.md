@@ -1,5 +1,7 @@
 # Online policy-reading results — 2026-10-24
 
+[English](ONLINE_RESULTS.md) | [简体中文](ONLINE_RESULTS.zh-CN.md)
+
 The agent selects files from the GitHub policy directory and reads originals online.
 These runs use the same 45 scenarios / 51 turns / 36 reference anchors as the
 historical keyword/hybrid evaluation, at policy commit

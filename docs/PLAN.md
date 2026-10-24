@@ -1,5 +1,7 @@
 # Implementation plan and current scope
 
+[English](PLAN.md) | [简体中文](PLAN.zh-CN.md)
+
 ## Current architecture
 
 LangChain tools/providers, a bounded LangGraph controller, FastAPI and React/TypeScript.

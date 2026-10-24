@@ -1,5 +1,7 @@
 # Agent 内部机制：LangChain、LangGraph 与检查点
 
+本文为中文文档。返回[中文文档目录](README.zh-CN.md)。
+
 本图对应当前 `policy-agent-online-v2` 实现，参与者表示代码职责，不是独立部署的服务。
 LangGraph 执行器一列包含我们定义的节点函数和条件路由。
 图中的 Hook 是节点内显式调用的 Python 检查函数；当前没有注册 LangChain middleware

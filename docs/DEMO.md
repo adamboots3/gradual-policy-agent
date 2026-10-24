@@ -1,5 +1,7 @@
 # Historical live browser demonstration
 
+[English](DEMO.md) | [简体中文](DEMO.zh-CN.md)
+
 This capture predates the 2026-10-24 window-only change. Saved-history reopening
 and the old UI controls are no longer current features. Its local hybrid policy
 retrieval was also replaced by online GitHub file reading on 2026-10-24.

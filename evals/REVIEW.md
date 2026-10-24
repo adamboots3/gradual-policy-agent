@@ -1,3 +1,5 @@
+[English](REVIEW.md) | [简体中文](REVIEW.zh-CN.md)
+
 Historical keyword/hybrid review; the architecture below was removed on 2026-10-24.
 Current online-agent observations are in [ONLINE_RESULTS](../docs/ONLINE_RESULTS.md).
 
