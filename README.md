@@ -9,9 +9,22 @@ with verified source excerpts. No local policy database, keyword/vector index,
 embedding service, document ingestion or prebuilt chunks are required.
 
 Repository: [adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent)
-(public). [Architecture and sequence diagram](docs/ARCHITECTURE.md),
-[Agent internals](docs/AGENT_INTERNALS.md), [verification](docs/VERIFICATION.md), [current results](docs/ONLINE_RESULTS.md),
+(public). Further documentation: [verification](docs/VERIFICATION.md), [current results](docs/ONLINE_RESULTS.md),
 [evaluation](evals/README.md).
+
+## Implemented capabilities
+
+| Capability | Status |
+| --- | --- |
+| Multi-turn conversations with temporary history | ✅ |
+| Source citations with original excerpts and versioned links | ✅ |
+| Web UI for interacting with the agent | ✅ |
+| Repeatable evaluation suite with 45 scenarios / 51 turns | ✅ |
+
+> **Start with the design diagrams:**
+>
+> - [System sequence diagram](docs/ARCHITECTURE.md): follow a question through the web client, Agent, LLM and GitHub reading tools.
+> - [Agent structure and execution](docs/AGENT_INTERNALS.md): explore LangChain/LangGraph, state, tool calling, validation hooks and routing.
 
 ## Run locally
 

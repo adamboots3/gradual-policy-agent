@@ -8,9 +8,22 @@
 无需本地政策数据库、关键词或向量索引、Embedding 服务、文档入库或预先切分的片段。
 
 项目仓库：[adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent)
-（公开仓库）。相关文档：[架构与时序图](docs/ARCHITECTURE.md)、
-[Agent 内部机制](docs/AGENT_INTERNALS.md)、[验证记录](docs/VERIFICATION.md)、
+（公开仓库）。其他文档：[验证记录](docs/VERIFICATION.md)、
 [当前评测结果](docs/ONLINE_RESULTS.md)、[评测说明](evals/README.zh-CN.md)。
+
+## 功能完成情况
+
+| 核心功能 | 状态 |
+| --- | --- |
+| 多轮对话，支持临时历史上下文 | ✅ |
+| 回答附带来源引用、原文摘录和固定版本链接 | ✅ |
+| 通过 Web 界面与 Agent 交互 | ✅ |
+| 可重复运行的评测套件，包含 45 个场景／51 轮问题 | ✅ |
+
+> **建议先看这两张设计图：**
+>
+> - [系统时序图](docs/ARCHITECTURE.md)：查看问题如何经过 Web、Agent、LLM 和 GitHub 读取工具完成一次问答。
+> - [Agent 结构与执行机制](docs/AGENT_INTERNALS.md)：了解 LangChain／LangGraph、状态、工具调用、校验 Hook 和路由如何协作。
 
 ## 本地运行
 
