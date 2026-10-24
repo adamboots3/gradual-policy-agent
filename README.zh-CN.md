@@ -8,7 +8,7 @@
 无需本地政策数据库、关键词或向量索引、Embedding 服务、文档入库或预先切分的片段。
 
 项目仓库：[adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent)
-（私有仓库，需要相应访问权限）。相关文档：[架构与时序图](docs/ARCHITECTURE.md)、
+（公开仓库）。相关文档：[架构与时序图](docs/ARCHITECTURE.md)、
 [Agent 内部机制](docs/AGENT_INTERNALS.md)、[验证记录](docs/VERIFICATION.md)、
 [当前评测结果](docs/ONLINE_RESULTS.md)、[评测说明](evals/README.zh-CN.md)。
 

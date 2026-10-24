@@ -19,5 +19,5 @@ history only in the current browser page.
 Current execution evidence is in [VERIFICATION](VERIFICATION.md). The
 [recorded evaluation](ONLINE_RESULTS.md) includes file-selection and interpretation
 failures; source provenance is not answer accuracy. The app has no authentication
-or public hosting configuration. Repository access is required for the private
+or public hosting configuration. Source is available in the public
 [source repository](https://github.com/adamboots3/gradual-policy-agent).

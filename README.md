@@ -9,7 +9,7 @@ with verified source excerpts. No local policy database, keyword/vector index,
 embedding service, document ingestion or prebuilt chunks are required.
 
 Repository: [adamboots3/gradual-policy-agent](https://github.com/adamboots3/gradual-policy-agent)
-(private; repository access required). [Architecture and sequence diagram](docs/ARCHITECTURE.md),
+(public). [Architecture and sequence diagram](docs/ARCHITECTURE.md),
 [Agent internals](docs/AGENT_INTERNALS.md), [verification](docs/VERIFICATION.md), [current results](docs/ONLINE_RESULTS.md),
 [evaluation](evals/README.md).
 
