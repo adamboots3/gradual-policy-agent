@@ -26,7 +26,10 @@ Repository: [adamboots3/gradual-policy-agent](https://github.com/adamboots3/grad
 > - [System sequence diagram](docs/ARCHITECTURE.md): follow a question through the web client, Agent, LLM and GitHub reading tools.
 > - [Agent structure and execution](docs/AGENT_INTERNALS.md): explore LangChain/LangGraph, state, tool calling, validation hooks and routing.
 
-**Demo (Chinese, about 63 seconds):** [Open / download the walkthrough video (MP4)](https://github.com/adamboots3/gradual-policy-agent/releases/download/demo-video/policy-agent-demo.mp4).
+**Demo (Chinese, about 63 seconds)**
+
+https://github.com/user-attachments/assets/973c5c1f-d90f-47a1-93fb-03a22c0006e2
+
 The walkthrough shows a policy question, source citations, opening the original policy on GitHub, and a follow-up question. Chinese subtitles are included as an optional track.
 
 ## Run locally
