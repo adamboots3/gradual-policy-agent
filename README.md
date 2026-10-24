@@ -1,5 +1,7 @@
 # GitHub Policy Support Agent
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 A web assistant built with LangChain, LangGraph, FastAPI and React/TypeScript.
 It browses [github/site-policy](https://github.com/github/site-policy) online:
 list policy files, let the LLM choose files, read their original lines, then answer
